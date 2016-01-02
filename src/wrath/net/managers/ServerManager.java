@@ -28,17 +28,41 @@ public abstract class ServerManager
     protected final Server server;
     protected ConnectionState state = ConnectionState.SOCKET_NOT_BOUND;
     
+    private final ArrayList<ServerClient> conList = new ArrayList<>();
+    private final ArrayList<ServerClient> dconList = new ArrayList<>();
     private final ArrayList<ServerReceivedEvent> execList = new ArrayList<>();
     protected final Thread execThread = new Thread(() ->
     {
         while(!recvFlag)
+        {
+            if(!conList.isEmpty())
+            {
+                ServerClient[] clis = new ServerClient[conList.size()];
+                conList.toArray(clis);
+                conList.clear();
+                for(ServerClient c : clis) c.getServer().getServerListener().onClientConnect(c);
+            }
+            
+            if(!dconList.isEmpty())
+            {
+                ServerClient[] clis = new ServerClient[dconList.size()];
+                dconList.toArray(clis);
+                dconList.clear();
+                for(ServerClient c : clis) c.getServer().getServerListener().onClientDisconnect(c);
+            }
+            
             if(!execList.isEmpty())
             {
                 ServerReceivedEvent[] events = new ServerReceivedEvent[execList.size()];
                 execList.toArray(events);
                 execList.clear();
-                for(ServerReceivedEvent event : events) event.client.getServer().getServerListener().onReceive(event.client, event.packet);
+                for(ServerReceivedEvent event : events)
+                {
+                    if(event.packet.getDataAsObject().equals(Packet.TERMINATION_CALL)) disconnectClient(event.client, false);
+                    else event.client.getServer().getServerListener().onReceive(event.client, event.packet);
+                }
             }
+        }
     });
     
     /**
@@ -137,6 +161,24 @@ public abstract class ServerManager
     public boolean isClientConnected(ServerClient client)
     {
         return clients.contains(client);
+    }
+    
+    /**
+     * Called when a {@link wrath.net.ServerClient} connects to the server.
+     * @param c The {@link wrath.net.ServerClient} connecting to the server.
+     */
+    protected void onClientConnect(ServerClient c)
+    {
+        conList.add(c);
+    }
+    
+    /**
+     * Called when a {@link wrath.net.ServerClient} disconnects from the server.
+     * @param c The {@link wrath.net.ServerClient} disconnecting from the server.
+     */
+    protected void onClientDisconnect(ServerClient c)
+    {
+        dconList.add(c);
     }
     
     /**

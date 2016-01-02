@@ -30,7 +30,11 @@ public abstract class ClientManager
                 ReceivedEvent[] events = new ReceivedEvent[execList.size()];
                 execList.toArray(events);
                 execList.clear();
-                for(ReceivedEvent event : events) event.client.getClientListener().onReceive(event.client, event.packet);
+                for(ReceivedEvent event : events)
+                {
+                    if(event.packet.getDataAsObject().equals(Packet.TERMINATION_CALL)) disconnect(false);
+                    event.client.getClientListener().onReceive(event.client, event.packet);
+                }
             }
     });
     protected Thread recvThread;

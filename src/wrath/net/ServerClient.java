@@ -5,6 +5,7 @@
 package wrath.net;
 
 import java.io.Serializable;
+import java.net.InetAddress;
 
 /**
  * Class to represent a Client that is connected to a Server.
@@ -12,17 +13,34 @@ import java.io.Serializable;
  */
 public class ServerClient
 {
+    private final InetAddress addr;
     private String ident = "";
     private final long joinTime = System.nanoTime();
+    private final int port;
     private final Server server;
     
     /**
      * Constructor.
      * @param server The local {@link wrath.net.Server} that this Client is connected to. 
+     * @param address The {@link java.net.InetAddress} this Client is connecting from.
+     * @param port The integer port that this Client is connecting from.
+     */
+    public ServerClient(Server server, InetAddress address, int port)
+    {
+        this(server, address, port, "[" + address.getHostAddress() + ":" + port + "]");
+    }
+    
+    /**
+     * Constructor.
+     * @param server The local {@link wrath.net.Server} that this Client is connected to. 
+     * @param address The {@link java.net.InetAddress} this Client is connecting from.
+     * @param port The integer port that this Client is connecting from.
      * @param identifier The wanted {@link java.lang.String} identifier for the Client. Typically "[IP:PORT]".
      */
-    public ServerClient(Server server, String identifier)
+    public ServerClient(Server server, InetAddress address, int port, String identifier)
     {
+        this.addr = address;
+        this.port = port;
         this.server = server;
         this.ident = identifier;
     }
@@ -34,6 +52,15 @@ public class ServerClient
     public void disconnectClient()
     {
         server.disconnectClient(this);
+    }
+    
+    /**
+     * Gets the {@link java.net.InetAddress} object linked with this Client, containing the Client's IP Address.
+     * @return Returns the {@link java.net.InetAddress} object linked with this Client, containing the Client's IP Address.
+     */
+    public InetAddress getAddress()
+    {
+        return addr;
     }
     
     /**
@@ -52,6 +79,15 @@ public class ServerClient
     public long getJoinTime()
     {
         return joinTime;
+    }
+    
+    /**
+     * Gets the port this client is connected to.
+     * @return Returns the port this client is connected to represented by an integer.
+     */
+    public int getPort()
+    {
+        return port;
     }
     
     /**

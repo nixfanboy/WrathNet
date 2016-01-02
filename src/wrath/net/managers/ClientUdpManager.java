@@ -32,30 +32,40 @@ public class ClientUdpManager extends ClientManager
         try
         {
             this.sock = new DatagramSocket();
+            sock.setSoTimeout(Client.getClientConfig().getInt("UdpTimeout", 500));
+            sock.setReceiveBufferSize(Client.getClientConfig().getInt("UdpProtocolRecvBufferSize", sock.getReceiveBufferSize()));
+            sock.setBroadcast(Client.getClientConfig().getBoolean("UdpSoBroadcast", sock.getBroadcast()));
+            sock.setSendBufferSize(Client.getClientConfig().getInt("UdpProtocolSendBufferSize", sock.getSendBufferSize()));
+            sock.setReuseAddress(Client.getClientConfig().getBoolean("UdpReuseAddress", sock.getReuseAddress()));
+            sock.setTrafficClass(Client.getClientConfig().getInt("UdpTrafficClass", sock.getTrafficClass()));
         }
         catch(SocketException ex)
         {
             System.err.println("[NET_CLIENT] Could not bind UDP Socket! Socket Error!");
         }
-        state = ConnectionState.SOCKET_NOT_BOUND;
+        
+        state = ConnectionState.DISCONNECTED_IDLE;
         this.recvThread = new Thread(() ->
         {
             final byte[] buf = new byte[Client.getClientConfig().getInt("UdpRecvBufferSize", 512)];
-            final DatagramPacket packet = new DatagramPacket(buf, buf.length);
-            while(!recvFlag && sock.isConnected())
+            while(!recvFlag && isConnected())
             {
                 try
                 {
+                    DatagramPacket packet = new DatagramPacket(buf, buf.length);
                     sock.receive(packet);
-                    client.getClientListener().onReceive(client, new Packet(packet.getData()));
+                    onReceive(client, new Packet(packet.getData()));
                 }
                 catch(IOException ex)
                 {
-                    System.err.println("[NET_CLIENT] Could not read data from [" + sock.getInetAddress().getHostAddress() + ":" + sock.getPort() + "]! I/O Error!");
+                    if(isConnected() && !recvFlag) System.err.println("[NET_CLIENT] Could not read data from [" + sock.getInetAddress().getHostAddress() + ":" + sock.getPort() + "]! I/O Error!");
                 }
             }
         });
         
+        execThread.setName("NetUdpClientExec");
+        execThread.setDaemon(true);
+        recvThread.setName("NetUdpClientRecv");
         recvThread.setDaemon(true);
     }
     
@@ -69,12 +79,12 @@ public class ClientUdpManager extends ClientManager
         
         state = ConnectionState.BINDING_PORT;
         System.out.println("[NET_CLIENT] Connecting to [" + ip + ":" + port + "]!");
+        
         try
         {
             sock.connect(InetAddress.getByName(ip), port);
             recvFlag = false;
             recvThread.start();
-            execThread.setDaemon(true);
             execThread.start();
             state = ConnectionState.LISTENING;
             System.out.println("[NET_CLIENT] Connected to [" + ip + ":" + port + "]!");
@@ -91,17 +101,19 @@ public class ClientUdpManager extends ClientManager
     public synchronized void disconnect(boolean calledFirst)
     {
         if(!isConnected()) return;
-        if(calledFirst)
-        {
-            System.out.println("[NET_CLIENT] Disconnecting from [" + ip + ":" + port + "]!");
-            client.send(Packet.TERMINATION_CALL);
-        } 
-        else System.out.println("[NET_CLIENT] Received disconnect signal from host!");
         recvFlag = true;
+        if(!calledFirst) System.out.println("[NET_CLIENT] Received disconnect signal from host.");
+        else send(new Packet(Packet.TERMINATION_CALL));
+        System.out.println("[NET_CLIENT] Disconnecting from [" + ip + ":" + port + "]!");
+        
         sock.disconnect();
         sock.close();
+        
+        state = ConnectionState.DISCONNECTED_SESSION_CLOSED;
+        System.out.println("[NET_CLIENT] Disconnected.");
+        
         recvThread.stop();
-        state = ConnectionState.SOCKET_CLOSED;
+        execThread.stop();
     }
     
     @Override
@@ -113,14 +125,14 @@ public class ClientUdpManager extends ClientManager
     @Override
     public synchronized void send(byte[] data)
     {
-        if(!isConnected()) return;
-        try
-        {
-            sock.send(new DatagramPacket(data, data.length));
-        }
-        catch(IOException ex)
-        {
-            System.err.println("[NET_CLIENT] Could not send data to [" + sock.getInetAddress().getHostAddress() + ":" + sock.getPort() + "]! I/O Error!");
-        }
+        if(isConnected())
+            try
+            {
+                sock.send(new DatagramPacket(data, data.length));
+            }
+            catch(IOException ex)
+            {
+                System.err.println("[NET_CLIENT] Could not send data to [" + sock.getInetAddress().getHostAddress() + ":" + sock.getPort() + "]! I/O Error!");
+            }
     }
 }

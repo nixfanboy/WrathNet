@@ -35,17 +35,23 @@ public class ClientTcpManager extends ClientManager
             sock.setSoTimeout(Client.getClientConfig().getInt("TcpTimeout", 500));
             sock.setKeepAlive(Client.getClientConfig().getBoolean("TcpKeepAlive", false));
             sock.setTcpNoDelay(Client.getClientConfig().getBoolean("TcpNoDelay", true));
+            sock.setReceiveBufferSize(Client.getClientConfig().getInt("TcpProtocolRecvBufferSize", sock.getReceiveBufferSize()));
+            sock.setSendBufferSize(Client.getClientConfig().getInt("TcpProtocolSendBufferSize", sock.getSendBufferSize()));
+            sock.setReuseAddress(Client.getClientConfig().getBoolean("TcpReuseAddress", true));
+            sock.setTrafficClass(Client.getClientConfig().getInt("TcpTrafficClass", sock.getTrafficClass()));
+            sock.setOOBInline(Client.getClientConfig().getBoolean("TcpOobInline", sock.getOOBInline()));
         }
         catch(SocketException e)
         {
             System.err.println("[NET_CLIENT] Could not set TCP Socket properties! I/O Error!");
         }
+        
         state = ConnectionState.DISCONNECTED_IDLE;
         this.recvThread = new Thread(() ->
         {
             final byte[] buf = new byte[Client.getClientConfig().getInt("TcpRecvBufferSize", 512)];
-            byte[] rbuf = new byte[0];
-            while(client.isConnected() && !recvFlag)
+            byte[] rbuf;
+            while(isConnected() && !recvFlag)
             {
                 try
                 {
@@ -57,33 +63,38 @@ public class ClientTcpManager extends ClientManager
                 }
                 catch(IOException e)
                 {
-                    System.err.println("[NET_CLIENT] Could not read from input stream from [" + ip + ":" + port + "]!");
+                    if(isConnected() && !recvFlag) System.err.println("[NET_CLIENT] Could not read from input stream from [" + ip + ":" + port + "]!");
                     continue;
                 }
-                Packet p = new Packet(rbuf);
-                if(p.getDataAsObject() != null && p.getDataAsObject().equals(Packet.TERMINATION_CALL)) disconnect(false);
-                else onReceive(client, p);
+                onReceive(client, new Packet(rbuf));
             }
         });
+        
+        execThread.setName("NetTcpClientExec");
+        execThread.setDaemon(true);
+        recvThread.setName("NetTcpClientRecv");
+        recvThread.setDaemon(true);
     }
     
     @Override
     public synchronized void connect(String ip, int port)
     {
         if(isConnected()) return;
+        
         this.ip = ip;
         this.port = port;
+        
         state = ConnectionState.CONNECTING;
         System.out.println("[NET_CLIENT] Connecting to [" + ip + ":" + port + "]!");
+        
         try
         {
             sock.connect(new InetSocketAddress(InetAddress.getByName(ip), port));
             recvFlag = false;
             recvThread.start();
-            execThread.setDaemon(true);
             execThread.start();
-            System.out.println("[NET_CLIENT] Connected to [" + ip + ":" + port + "]!");
             state = ConnectionState.CONNECTED;
+            System.out.println("[NET_CLIENT] Connected to [" + ip + ":" + port + "]!");
         }
         catch(UnknownHostException e)
         {
@@ -100,23 +111,28 @@ public class ClientTcpManager extends ClientManager
     @Override
     public synchronized void disconnect(boolean calledFirst)
     {
-        if(!client.isConnected()) return;
+        if(!isConnected()) return;
         recvFlag = true;
         if(!calledFirst) System.out.println("[NET_CLIENT] Received disconnect signal from host.");
+        else send(new Packet(Packet.TERMINATION_CALL));
         System.out.println("[NET_CLIENT] Disconnecting from [" + ip + ":" + port + "]!");
-        //This termination call is specific to this net engine.
-        if(calledFirst) send(new Packet(Packet.TERMINATION_CALL));
+        
         try
         {
             sock.close();
-            state = ConnectionState.DISCONNECTED_SESSION_CLOSED;
-            System.out.println("[NET_CLIENT] Disconnected.");
         }
         catch(IOException e)
         {
             state = ConnectionState.DISCONNECTED_CONNECTION_DROPPED;
             System.err.println("[NET_CLIENT] I/O Error occured while closing socket from [" + ip + ":" + port + "]!");
+            return;
         }
+        
+        state = ConnectionState.DISCONNECTED_SESSION_CLOSED;
+        System.out.println("[NET_CLIENT] Disconnected.");
+        
+        recvThread.stop();
+        execThread.stop();
     }
     
     @Override

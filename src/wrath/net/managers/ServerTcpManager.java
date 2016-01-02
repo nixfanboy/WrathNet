@@ -46,14 +46,14 @@ public class ServerTcpManager extends ServerManager
                 try
                 {
                     Socket s = svr.accept();
-                    ServerClient c = new ServerClient(server, "[" + s.getInetAddress().getHostAddress() + ":" + s.getPort() + "]");
+                    ServerClient c = new ServerClient(server, s.getInetAddress(), s.getPort());
                     Thread client = new Thread(() ->
                     {
                         System.out.println("[NET_SERVER] Client connected from " + c.getClientIdentifier() + ".");
                         clientToSock.put(c, s);
                         clients.add(c);
                         
-                        server.getServerListener().onClientConnect(c);
+                        onClientConnect(c);
                         
                         final byte[] buf = new byte[Server.getServerConfig().getInt("TcpClientRecvBufferSize", 512)];
                         byte[] rbuf;
@@ -71,15 +71,10 @@ public class ServerTcpManager extends ServerManager
                             catch(IOException e)
                             {
                                 if(!c.isConnected()) break;
-                                else continue;
+                                else if(!recvFlag && isBound()) System.err.println("[NET_SERVER] Could not read data from " + c.getClientIdentifier() + "! I/O Error!");
+                                continue;
                             }
-                            Packet p = new Packet(rbuf);
-                            try
-                            {
-                                if(p.getDataAsObject().equals(Packet.TERMINATION_CALL)) disconnectClient(c, false);
-                                else onReceive(c, p);
-                            }
-                            catch(Exception e){}
+                            onReceive(c, new Packet(rbuf));
                         }
                         
                         if(clients.contains(c))
@@ -95,10 +90,11 @@ public class ServerTcpManager extends ServerManager
                 }
                 catch(IOException ex)
                 {
-                    System.err.println("[NET_SERVER] Could not connect Client, I/O Error!");
+                    if(!recvFlag && isBound()) System.err.println("[NET_SERVER] Could not connect Client, I/O Error!");
                 }
             }
         });
+        execThread.setDaemon(true);
     }
 
     @Override
@@ -109,8 +105,11 @@ public class ServerTcpManager extends ServerManager
         if(ip == null) ip = "*";
         this.ip = ip;
         this.port = port;
-        int backlog = Server.getServerConfig().getInt("TcpBacklog", 0);
+        
+        recvFlag = false;
         state = ConnectionState.BINDING_PORT;
+        
+        int backlog = Server.getServerConfig().getInt("TcpBacklog", 0);
         if(backlog == 0)
         {
             try
@@ -122,7 +121,9 @@ public class ServerTcpManager extends ServerManager
             }
             catch(IOException ex)
             {
-                System.err.println("[NET_SERVER] Could not bind ServerSocket to [" + ip + ":" + port + "]! I/O Error!");
+                System.err.println("[NET_SERVER] Could not bind port to [" + ip + ":" + port + "]! Socket Error/Port '" + port + "' already bound!");
+                state = ConnectionState.SOCKET_NOT_BOUND_ERROR;
+                return;
             }
         }
         else
@@ -135,8 +136,9 @@ public class ServerTcpManager extends ServerManager
             }
             catch(IOException ex)
             {
-                System.err.println("[NET_SERVER] Could not bind ServerSocket to [" + ip + ":" + port + "]! I/O Error!");
+                System.err.println("[NET_SERVER] Could not bind port to [" + ip + ":" + port + "]! Socket Error/Port '" + port + "' already bound!");
                 state = ConnectionState.SOCKET_NOT_BOUND_ERROR;
+                return;
             }
         }
 
@@ -148,7 +150,6 @@ public class ServerTcpManager extends ServerManager
         else state = ConnectionState.LISTENING;
         
         recvThread.start();
-        execThread.setDaemon(true);
         execThread.start();
     }
 
@@ -166,7 +167,7 @@ public class ServerTcpManager extends ServerManager
         clients.remove(client);
         clientToSock.remove(client);
         
-        client.getServer().getServerListener().onClientDisconnect(client);
+        onClientDisconnect(client);
         
         try
         {
@@ -212,7 +213,7 @@ public class ServerTcpManager extends ServerManager
     public synchronized void unbindSocket()
     {
         if(!isBound()) return;
-        System.out.println("[NET_SERVER] Closing ServerSocket");
+        System.out.println("[NET_SERVER] Closing ServerSocket.");
         recvFlag = true;
         
         server.getClients().stream().forEach((c) ->
@@ -229,7 +230,11 @@ public class ServerTcpManager extends ServerManager
             System.err.println("[NET_SERVER] Error while closing Server Socket! I/O Error!");
             state = ConnectionState.SOCKET_CLOSED;
         }
-        recvThread.stop();
+        
         state = ConnectionState.SOCKET_CLOSED;
+        System.out.println("[NET_SERVER] ServerSocket Closed.");
+        
+        recvThread.stop();
+        execThread.stop();
     }
 }
