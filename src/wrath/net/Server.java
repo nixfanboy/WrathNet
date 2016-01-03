@@ -4,6 +4,7 @@
  */
 package wrath.net;
 
+import java.io.File;
 import java.io.Serializable;
 import java.util.Arrays;
 import java.util.Collection;
@@ -20,7 +21,7 @@ import wrath.util.Config;
  */
 public class Server 
 {
-    private static final Config serverCfg = new Config("netserver");
+    private static final Config serverCfg = new Config(new File("netserver.cfg"));
     
     private final HashSet<SessionFlag> flags = new HashSet<>();
     private ServerListener listener;

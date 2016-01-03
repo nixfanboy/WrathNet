@@ -41,7 +41,7 @@ public class ClientUdpManager extends ClientManager
         }
         catch(SocketException ex)
         {
-            System.err.println("[NET_CLIENT] Could not bind UDP Socket! Socket Error!");
+            System.err.println("Could not bind UDP Socket! Socket Error!");
         }
         
         state = ConnectionState.DISCONNECTED_IDLE;
@@ -58,7 +58,7 @@ public class ClientUdpManager extends ClientManager
                 }
                 catch(IOException ex)
                 {
-                    if(isConnected() && !recvFlag) System.err.println("[NET_CLIENT] Could not read data from [" + sock.getInetAddress().getHostAddress() + ":" + sock.getPort() + "]! I/O Error!");
+                    if(isConnected() && !recvFlag) System.err.println("Could not read data from [" + sock.getInetAddress().getHostAddress() + ":" + sock.getPort() + "]! I/O Error!");
                 }
             }
         });
@@ -78,7 +78,7 @@ public class ClientUdpManager extends ClientManager
         this.port = port;
         
         state = ConnectionState.BINDING_PORT;
-        System.out.println("[NET_CLIENT] Connecting to [" + ip + ":" + port + "]!");
+        System.out.println("Connecting to [" + ip + ":" + port + "]!");
         
         try
         {
@@ -87,12 +87,12 @@ public class ClientUdpManager extends ClientManager
             recvThread.start();
             execThread.start();
             state = ConnectionState.LISTENING;
-            System.out.println("[NET_CLIENT] Connected to [" + ip + ":" + port + "]!");
+            System.out.println("Connected to [" + ip + ":" + port + "]!");
             send("init");
         }
         catch(UnknownHostException ex)
         {
-            System.err.println("[NET_CLIENT] Could not resolve hostname/ip [" + ip + "]!");
+            System.err.println("Could not resolve hostname/ip [" + ip + "]!");
             state = ConnectionState.DISCONNECTED_CONNECTION_FAILED;
         }
     }
@@ -102,15 +102,15 @@ public class ClientUdpManager extends ClientManager
     {
         if(!isConnected()) return;
         recvFlag = true;
-        if(!calledFirst) System.out.println("[NET_CLIENT] Received disconnect signal from host.");
+        if(!calledFirst) System.out.println("Received disconnect signal from host.");
         else send(new Packet(Packet.TERMINATION_CALL));
-        System.out.println("[NET_CLIENT] Disconnecting from [" + ip + ":" + port + "]!");
+        System.out.println("Disconnecting from [" + ip + ":" + port + "]!");
         
         sock.disconnect();
         sock.close();
         
         state = ConnectionState.DISCONNECTED_SESSION_CLOSED;
-        System.out.println("[NET_CLIENT] Disconnected.");
+        System.out.println("Disconnected.");
         
         recvThread.stop();
         execThread.stop();
@@ -132,7 +132,7 @@ public class ClientUdpManager extends ClientManager
             }
             catch(IOException ex)
             {
-                System.err.println("[NET_CLIENT] Could not send data to [" + sock.getInetAddress().getHostAddress() + ":" + sock.getPort() + "]! I/O Error!");
+                System.err.println("Could not send data to [" + sock.getInetAddress().getHostAddress() + ":" + sock.getPort() + "]! I/O Error!");
             }
     }
 }
