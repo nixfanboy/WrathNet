@@ -36,7 +36,7 @@ public class ServerTcpManager extends ServerManager
         }
         catch(IOException ex)
         {
-            System.err.println("I/O Error occured while creating ServerSocket object. Cannot create server.");
+            System.err.println("] I/O Error occured while creating ServerSocket object. Cannot create server.");
         }
         state = ConnectionState.SOCKET_NOT_BOUND;
         this.recvThread = new Thread(() ->
@@ -49,7 +49,7 @@ public class ServerTcpManager extends ServerManager
                     ServerClient c = new ServerClient(server, s.getInetAddress(), s.getPort());
                     Thread client = new Thread(() ->
                     {
-                        System.out.println("Client connected from " + c.getClientIdentifier() + ".");
+                        System.out.println("] Client connected from " + c.getClientIdentifier() + ".");
                         clientToSock.put(c, s);
                         clients.add(c);
                         
@@ -71,7 +71,7 @@ public class ServerTcpManager extends ServerManager
                             catch(IOException e)
                             {
                                 if(!c.isConnected()) break;
-                                else if(!recvFlag && isBound()) System.err.println("Could not read data from " + c.getClientIdentifier() + "! I/O Error!");
+                                else if(!recvFlag && isBound()) System.err.println("] Could not read data from " + c.getClientIdentifier() + "! I/O Error!");
                                 continue;
                             }
                             onReceive(c, new Packet(rbuf));
@@ -80,7 +80,7 @@ public class ServerTcpManager extends ServerManager
                         if(clients.contains(c))
                             try
                             {
-                                System.err.println("Client " + c.getClientIdentifier() + " unexpectedly disconnected!");
+                                System.err.println("] Client " + c.getClientIdentifier() + " unexpectedly disconnected!");
                                 s.close();
                             }
                             catch(IOException e){}
@@ -90,7 +90,7 @@ public class ServerTcpManager extends ServerManager
                 }
                 catch(IOException ex)
                 {
-                    if(!recvFlag && isBound()) System.err.println("Could not connect Client, I/O Error!");
+                    if(!recvFlag && isBound()) System.err.println("] Could not connect Client, I/O Error!");
                 }
             }
         });
@@ -117,11 +117,11 @@ public class ServerTcpManager extends ServerManager
                 if("*".equals(ip)) svr.bind(new InetSocketAddress(port));
                 else svr.bind(new InetSocketAddress(ip, port));
                 
-                System.out.println("ServerSocket bound to [" + ip + ":" + port + "].");
+                System.out.println("] ServerSocket bound to [" + ip + ":" + port + "].");
             }
             catch(IOException ex)
             {
-                System.err.println("Could not bind port to [" + ip + ":" + port + "]! Socket Error/Port '" + port + "' already bound!");
+                System.err.println("] Could not bind port to [" + ip + ":" + port + "]! Socket Error/Port '" + port + "' already bound!");
                 state = ConnectionState.SOCKET_NOT_BOUND_ERROR;
                 return;
             }
@@ -132,11 +132,11 @@ public class ServerTcpManager extends ServerManager
             {
                 if("*".equals(ip)) svr.bind(new InetSocketAddress(port), backlog);
                 else svr.bind(new InetSocketAddress(ip, port), backlog);
-                System.out.println("ServerSocket bound to [" + ip + ":" + port + "].");
+                System.out.println("] ServerSocket bound to [" + ip + ":" + port + "].");
             }
             catch(IOException ex)
             {
-                System.err.println("Could not bind port to [" + ip + ":" + port + "]! Socket Error/Port '" + port + "' already bound!");
+                System.err.println("] Could not bind port to [" + ip + ":" + port + "]! Socket Error/Port '" + port + "' already bound!");
                 state = ConnectionState.SOCKET_NOT_BOUND_ERROR;
                 return;
             }
@@ -144,7 +144,7 @@ public class ServerTcpManager extends ServerManager
 
         if(!isBound())
         {
-            System.err.println("Could not bind ServerSocket to [" + ip + ":" + port + "]! UNKNOWN Error!");
+            System.err.println("] Could not bind ServerSocket to [" + ip + ":" + port + "]! UNKNOWN Error!");
             state = ConnectionState.SOCKET_NOT_BOUND_ERROR;
         }
         else state = ConnectionState.LISTENING;
@@ -160,10 +160,10 @@ public class ServerTcpManager extends ServerManager
         Socket s = clientToSock.get(client);
         if(calledFirst)
         {
-            System.out.println("Disconnecting Client " + client.getClientIdentifier() + ".");
+            System.out.println("] Disconnecting Client " + client.getClientIdentifier() + ".");
             if(s != null) client.send(Packet.TERMINATION_CALL);
         }
-        else System.out.println("Client " + client.getClientIdentifier() + " Disconnecting.");
+        else System.out.println("] Client " + client.getClientIdentifier() + " Disconnecting.");
         clients.remove(client);
         clientToSock.remove(client);
         
@@ -179,9 +179,9 @@ public class ServerTcpManager extends ServerManager
         }
         catch(IOException ex)
         {
-            System.err.println("Could not close connection from " + client.getClientIdentifier() + "! I/O Error!");
+            System.err.println("] Could not close connection from " + client.getClientIdentifier() + "! I/O Error!");
         }
-        System.out.println("Client " + client.getClientIdentifier() + " Disconnected. ConnectionTime: " + ((double)(System.nanoTime() - client.getJoinTime())/1000000000) + "s");
+        System.out.println("] Client " + client.getClientIdentifier() + " Disconnected. ConnectionTime: " + ((double)(System.nanoTime() - client.getJoinTime())/1000000000) + "s");
     }
     
     @Override
@@ -203,23 +203,25 @@ public class ServerTcpManager extends ServerManager
             }
             catch(IOException e)
             {
-                System.err.println("Could not send data to " + client.getClientIdentifier() + "! DataSize: " + data.length + "B");
+                System.err.println("] Could not send data to " + client.getClientIdentifier() + "! DataSize: " + data.length + "B");
             }
         }
-        else System.out.println("WARNING: Attempted to send data to unknown client!");
+        else System.out.println("] WARNING: Attempted to send data to unknown client!");
     }
     
     @Override
     public synchronized void unbindSocket()
     {
         if(!isBound()) return;
-        System.out.println("Closing ServerSocket.");
-        recvFlag = true;
+        System.out.println("] Closing ServerSocket.");
         
-        server.getClients().stream().forEach((c) ->
-        {
-            c.disconnectClient();
-        });
+        ServerClient[] clis = new ServerClient[clients.size()];
+        clients.toArray(clis);
+        for(ServerClient c : clis)
+            if(c.isConnected()) c.disconnectClient();
+        clients.clear();
+        
+        recvFlag = true;
         
         try
         {
@@ -227,12 +229,12 @@ public class ServerTcpManager extends ServerManager
         }
         catch(IOException ex)
         {
-            System.err.println("Error while closing Server Socket! I/O Error!");
+            System.err.println("] Error while closing Server Socket! I/O Error!");
             state = ConnectionState.SOCKET_CLOSED;
         }
         
         state = ConnectionState.SOCKET_CLOSED;
-        System.out.println("ServerSocket Closed.");
+        System.out.println("] ServerSocket Closed.");
         
         recvThread.stop();
         execThread.stop();

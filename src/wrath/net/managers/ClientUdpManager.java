@@ -41,25 +41,22 @@ public class ClientUdpManager extends ClientManager
         }
         catch(SocketException ex)
         {
-            System.err.println("Could not bind UDP Socket! Socket Error!");
+            System.err.println("] Could not bind UDP Socket! Socket Error!");
         }
         
         state = ConnectionState.DISCONNECTED_IDLE;
         this.recvThread = new Thread(() ->
         {
             final byte[] buf = new byte[Client.getClientConfig().getInt("UdpRecvBufferSize", 512)];
+            final DatagramPacket packet = new DatagramPacket(buf, buf.length);
             while(!recvFlag && isConnected())
             {
                 try
                 {
-                    DatagramPacket packet = new DatagramPacket(buf, buf.length);
                     sock.receive(packet);
                     onReceive(client, new Packet(packet.getData()));
                 }
-                catch(IOException ex)
-                {
-                    if(isConnected() && !recvFlag) System.err.println("Could not read data from [" + sock.getInetAddress().getHostAddress() + ":" + sock.getPort() + "]! I/O Error!");
-                }
+                catch(IOException ex){}
             }
         });
         
@@ -78,7 +75,7 @@ public class ClientUdpManager extends ClientManager
         this.port = port;
         
         state = ConnectionState.BINDING_PORT;
-        System.out.println("Connecting to [" + ip + ":" + port + "]!");
+        System.out.println("] Connecting to [" + ip + ":" + port + "]!");
         
         try
         {
@@ -86,13 +83,13 @@ public class ClientUdpManager extends ClientManager
             recvFlag = false;
             recvThread.start();
             execThread.start();
-            state = ConnectionState.LISTENING;
-            System.out.println("Connected to [" + ip + ":" + port + "]!");
+            state = ConnectionState.CONNECTED;
+            System.out.println("] Connected to [" + ip + ":" + port + "]!");
             send("init");
         }
         catch(UnknownHostException ex)
         {
-            System.err.println("Could not resolve hostname/ip [" + ip + "]!");
+            System.err.println("] Could not resolve hostname/ip [" + ip + "]!");
             state = ConnectionState.DISCONNECTED_CONNECTION_FAILED;
         }
     }
@@ -102,15 +99,15 @@ public class ClientUdpManager extends ClientManager
     {
         if(!isConnected()) return;
         recvFlag = true;
-        if(!calledFirst) System.out.println("Received disconnect signal from host.");
+        if(!calledFirst) System.out.println("] Received disconnect signal from host.");
         else send(new Packet(Packet.TERMINATION_CALL));
-        System.out.println("Disconnecting from [" + ip + ":" + port + "]!");
+        System.out.println("] Disconnecting from [" + ip + ":" + port + "]!");
         
         sock.disconnect();
         sock.close();
         
         state = ConnectionState.DISCONNECTED_SESSION_CLOSED;
-        System.out.println("Disconnected.");
+        System.out.println("] Disconnected.");
         
         recvThread.stop();
         execThread.stop();
@@ -128,11 +125,12 @@ public class ClientUdpManager extends ClientManager
         if(isConnected())
             try
             {
-                sock.send(new DatagramPacket(data, data.length));
+                DatagramPacket pack = new DatagramPacket(data, data.length);
+                sock.send(pack);
             }
             catch(IOException ex)
             {
-                System.err.println("Could not send data to [" + sock.getInetAddress().getHostAddress() + ":" + sock.getPort() + "]! I/O Error!");
+                System.err.println("] Could not send data to [" + sock.getInetAddress().getHostAddress() + ":" + sock.getPort() + "]! I/O Error!");
             }
     }
 }

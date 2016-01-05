@@ -43,7 +43,7 @@ public class ClientTcpManager extends ClientManager
         }
         catch(SocketException e)
         {
-            System.err.println("Could not set TCP Socket properties! I/O Error!");
+            System.err.println("] Could not set TCP Socket properties! I/O Error!");
         }
         
         state = ConnectionState.DISCONNECTED_IDLE;
@@ -63,7 +63,7 @@ public class ClientTcpManager extends ClientManager
                 }
                 catch(IOException e)
                 {
-                    if(isConnected() && !recvFlag) System.err.println("Could not read from input stream from [" + ip + ":" + port + "]!");
+                    if(isConnected() && !recvFlag) System.err.println("] Could not read from input stream from [" + ip + ":" + port + "]!");
                     continue;
                 }
                 onReceive(client, new Packet(rbuf));
@@ -85,7 +85,7 @@ public class ClientTcpManager extends ClientManager
         this.port = port;
         
         state = ConnectionState.CONNECTING;
-        System.out.println("Connecting to [" + ip + ":" + port + "]!");
+        System.out.println("] Connecting to [" + ip + ":" + port + "]!");
         
         try
         {
@@ -94,16 +94,16 @@ public class ClientTcpManager extends ClientManager
             recvThread.start();
             execThread.start();
             state = ConnectionState.CONNECTED;
-            System.out.println("Connected to [" + ip + ":" + port + "]!");
+            System.out.println("] Connected to [" + ip + ":" + port + "]!");
         }
         catch(UnknownHostException e)
         {
-            System.err.println("Could not resolve hostname/ip [" + ip + "]!");
+            System.err.println("] Could not resolve hostname/ip [" + ip + "]!");
             state = ConnectionState.DISCONNECTED_CONNECTION_FAILED;
         }
         catch(IOException ex)
         {
-            System.err.println("Could not connect to [" + ip + ":" + port + "]! I/O Error!");
+            System.err.println("] Could not connect to [" + ip + ":" + port + "]! I/O Error!");
             state = ConnectionState.DISCONNECTED_CONNECTION_FAILED;
         }
     }
@@ -113,9 +113,9 @@ public class ClientTcpManager extends ClientManager
     {
         if(!isConnected()) return;
         recvFlag = true;
-        if(!calledFirst) System.out.println("Received disconnect signal from host.");
+        if(!calledFirst) System.out.println("] Received disconnect signal from host.");
         else send(new Packet(Packet.TERMINATION_CALL));
-        System.out.println("Disconnecting from [" + ip + ":" + port + "]!");
+        System.out.println("] Disconnecting from [" + ip + ":" + port + "]!");
         
         try
         {
@@ -124,12 +124,12 @@ public class ClientTcpManager extends ClientManager
         catch(IOException e)
         {
             state = ConnectionState.DISCONNECTED_CONNECTION_DROPPED;
-            System.err.println("I/O Error occured while closing socket from [" + ip + ":" + port + "]!");
+            System.err.println("] I/O Error occured while closing socket from [" + ip + ":" + port + "]!");
             return;
         }
         
         state = ConnectionState.DISCONNECTED_SESSION_CLOSED;
-        System.out.println("Disconnected.");
+        System.out.println("] Disconnected.");
         
         recvThread.stop();
         execThread.stop();
@@ -152,7 +152,7 @@ public class ClientTcpManager extends ClientManager
             }
             catch(IOException ex) 
             {
-                System.err.println("Could not send data to [" + ip + ":" + port + "]! DataSize: " + data.length + "B");
+                System.err.println("] Could not send data to [" + ip + ":" + port + "]! DataSize: " + data.length + "B");
             }
     }
 }
