@@ -106,6 +106,7 @@ public class ClientTcpManager extends ClientManager
             System.err.println("] Could not connect to [" + ip + ":" + port + "]! I/O Error!");
             state = ConnectionState.DISCONNECTED_CONNECTION_FAILED;
         }
+        
     }
     
     @Override
