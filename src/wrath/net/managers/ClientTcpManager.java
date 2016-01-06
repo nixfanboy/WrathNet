@@ -13,6 +13,8 @@ import java.net.UnknownHostException;
 import wrath.net.Client;
 import wrath.net.ConnectionState;
 import wrath.net.Packet;
+import wrath.net.SessionFlag;
+import wrath.util.MiscUtils;
 
 /**
  * Class to manage Client Connections using TCP.
@@ -148,6 +150,7 @@ public class ClientTcpManager extends ClientManager
         if(client.isConnected()) 
             try 
             {
+                if(client.getSessionFlags().contains(SessionFlag.GZIP_COMPRESSION)) data = MiscUtils.compressData(data);
                 sock.getOutputStream().write(data);
                 sock.getOutputStream().flush();
             }

@@ -9,6 +9,8 @@ import java.util.ArrayList;
 import wrath.net.Client;
 import wrath.net.ConnectionState;
 import wrath.net.Packet;
+import wrath.net.SessionFlag;
+import wrath.util.MiscUtils;
 
 /**
  * Abstract class that allows for polymorphism based on the protocol used in a connection.
@@ -16,7 +18,7 @@ import wrath.net.Packet;
  */
 public abstract class ClientManager
 {
-    protected final Client client;
+    protected Client client;
     protected String ip = "0.0.0.0";
     protected int ping = -1;
     protected int port = 0;
@@ -32,8 +34,11 @@ public abstract class ClientManager
                 execList.clear();
                 for(ReceivedEvent event : events)
                 {
-                    if(event.packet.getDataAsObject().equals(Packet.TERMINATION_CALL)) disconnect(false);
-                    event.client.getClientListener().onReceive(event.client, event.packet);
+                    Packet p = event.packet;
+                    if(client.getSessionFlags().contains(SessionFlag.GZIP_COMPRESSION))  p = new Packet(MiscUtils.decompressData(p.getRawData(), MiscUtils.CompressionType.GZIP));
+                    else if(Client.getClientConfig().getBoolean("CheckForGZIPCompression", false)) if(MiscUtils.isGZIPCompressed(p.getRawData())) p = new Packet(MiscUtils.decompressData(p.getRawData(), MiscUtils.CompressionType.GZIP));
+                    if(p.getDataAsObject().equals(Packet.TERMINATION_CALL)) disconnect(false);
+                    event.client.getClientListener().onReceive(event.client, p);
                 }
             }
     });

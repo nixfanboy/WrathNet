@@ -8,10 +8,13 @@ import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
+import wrath.net.Client;
 import wrath.net.ConnectionState;
 import wrath.net.Packet;
 import wrath.net.Server;
 import wrath.net.ServerClient;
+import wrath.net.SessionFlag;
+import wrath.util.MiscUtils;
 
 /**
  * Abstract class that allows for polymorphism based on the protocol used in a connection.
@@ -25,7 +28,7 @@ public abstract class ServerManager
     protected int port = 0;
     protected volatile boolean recvFlag = false;
     protected Thread recvThread;
-    protected final Server server;
+    protected Server server;
     protected ConnectionState state = ConnectionState.SOCKET_NOT_BOUND;
     
     private final ArrayList<ServerClient> conList = new ArrayList<>();
@@ -58,8 +61,11 @@ public abstract class ServerManager
                 execList.clear();
                 for(ServerReceivedEvent event : events)
                 {
-                    if(event.packet.getDataAsObject().equals(Packet.TERMINATION_CALL)) disconnectClient(event.client, false);
-                    else event.client.getServer().getServerListener().onReceive(event.client, event.packet);
+                    Packet p = event.packet;
+                    if(server.getSessionFlags().contains(SessionFlag.GZIP_COMPRESSION))  p = new Packet(MiscUtils.decompressData(p.getRawData(), MiscUtils.CompressionType.GZIP));
+                    else if(Server.getServerConfig().getBoolean("CheckForGZIPCompression", false)) if(MiscUtils.isGZIPCompressed(p.getRawData())) p = new Packet(MiscUtils.decompressData(p.getRawData(), MiscUtils.CompressionType.GZIP));
+                    if(p.getDataAsObject().equals(Packet.TERMINATION_CALL)) disconnectClient(event.client, false);
+                    else event.client.getServer().getServerListener().onReceive(event.client, p);
                 }
             }
         }
