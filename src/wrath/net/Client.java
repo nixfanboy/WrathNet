@@ -114,16 +114,6 @@ public class Client
     }
     
     /**
-     * Gets the amount of time (in milliseconds) it takes to send and receive data from the Server the Client is connected to.
-     * @see wrath.net.managers.ClientManager#ping() 
-     * @return Returns the amount of time (in milliseconds) it takes to send and receive data from the Server the Client is connected to. Returns -1 if not connected.
-     */
-    public int getPing()
-    {
-        return man.ping();
-    }
-    
-    /**
      * Gets the IP Address/Hostname of the current or last Server in the form of a String.
      * Returns "0.0.0.0" if never connected.
      * @see wrath.net.managers.ClientManager#getServerIP() 

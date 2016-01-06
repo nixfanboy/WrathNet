@@ -121,15 +121,6 @@ public abstract class ClientManager
     }
     
     /**
-     * Gets the amount of time (in milliseconds) it takes to send and receive data from the Server the Client is connected to.
-     * @return Returns the amount of time (in milliseconds) it takes to send and receive data from the Server the Client is connected to. Returns -1 if not connected.
-     */
-    public int ping()
-    {
-        return ping;
-    }
-    
-    /**
      * Sends data to the Server the Client is connected to, if it is connected.
      * @param data The raw byte data to send to the Server.
      */
