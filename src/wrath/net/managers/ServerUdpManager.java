@@ -60,6 +60,8 @@ public class ServerUdpManager extends ServerManager
             }
         });
         
+        recvThread.setName("NetUdpServerRecv");
+        execThread.setName("NetUdpServerExec");
         execThread.setDaemon(true);
     }
 

@@ -94,6 +94,9 @@ public class ServerTcpManager extends ServerManager
                 }
             }
         });
+        
+        recvThread.setName("NetTcpServerRecv");
+        execThread.setName("NetTcpServerExec");
         execThread.setDaemon(true);
     }
 
