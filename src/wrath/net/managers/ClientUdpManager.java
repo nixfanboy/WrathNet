@@ -8,6 +8,7 @@ import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
+import java.net.InetSocketAddress;
 import java.net.SocketException;
 import java.net.UnknownHostException;
 import wrath.net.Client;
@@ -20,7 +21,7 @@ import wrath.net.Packet;
  */
 public class ClientUdpManager extends ClientManager
 {
-    private DatagramSocket sock;
+    private DatagramSocket sock = null;
     
     /**
      * Constructor.
@@ -29,41 +30,9 @@ public class ClientUdpManager extends ClientManager
     public ClientUdpManager(Client client)
     {
         super(client);
-        try
-        {
-            this.sock = new DatagramSocket();
-            sock.setSoTimeout(Client.getClientConfig().getInt("UdpTimeout", 500));
-            sock.setReceiveBufferSize(Client.getClientConfig().getInt("UdpProtocolRecvBufferSize", sock.getReceiveBufferSize()));
-            sock.setBroadcast(Client.getClientConfig().getBoolean("UdpSoBroadcast", sock.getBroadcast()));
-            sock.setSendBufferSize(Client.getClientConfig().getInt("UdpProtocolSendBufferSize", sock.getSendBufferSize()));
-            sock.setReuseAddress(Client.getClientConfig().getBoolean("UdpReuseAddress", sock.getReuseAddress()));
-            sock.setTrafficClass(Client.getClientConfig().getInt("UdpTrafficClass", sock.getTrafficClass()));
-        }
-        catch(SocketException ex)
-        {
-            System.err.println("] Could not bind UDP Socket! Socket Error!");
-        }
         
         state = ConnectionState.DISCONNECTED_IDLE;
-        this.recvThread = new Thread(() ->
-        {
-            final byte[] buf = new byte[Client.getClientConfig().getInt("UdpRecvBufferSize", 512)];
-            final DatagramPacket packet = new DatagramPacket(buf, buf.length);
-            while(!recvFlag && isConnected())
-            {
-                try
-                {
-                    sock.receive(packet);
-                    onReceive(client, new Packet(packet.getData()));
-                }
-                catch(IOException ex){}
-            }
-        });
         
-        execThread.setName("NetUdpClientExec");
-        execThread.setDaemon(true);
-        recvThread.setName("NetUdpClientRecv");
-        recvThread.setDaemon(true);
     }
     
     @Override
@@ -95,6 +64,42 @@ public class ClientUdpManager extends ClientManager
     }
     
     @Override
+    protected synchronized void createNewSocket(InetSocketAddress addr) throws IOException
+    {
+        try
+        {
+            this.sock = new DatagramSocket();
+            sock.setSoTimeout(Client.getClientConfig().getInt("UdpTimeout", 500));
+            sock.setReceiveBufferSize(Client.getClientConfig().getInt("UdpProtocolRecvBufferSize", sock.getReceiveBufferSize()));
+            sock.setBroadcast(Client.getClientConfig().getBoolean("UdpSoBroadcast", sock.getBroadcast()));
+            sock.setSendBufferSize(Client.getClientConfig().getInt("UdpProtocolSendBufferSize", sock.getSendBufferSize()));
+            sock.setReuseAddress(Client.getClientConfig().getBoolean("UdpReuseAddress", sock.getReuseAddress()));
+            sock.setTrafficClass(Client.getClientConfig().getInt("UdpTrafficClass", sock.getTrafficClass()));
+        }
+        catch(SocketException ex)
+        {
+            System.err.println("] Could not bind UDP Socket! Socket Error!");
+        }
+        
+        this.recvThread = new Thread(() ->
+        {
+            final byte[] buf = new byte[Client.getClientConfig().getInt("UdpRecvBufferSize", 512)];
+            final DatagramPacket packet = new DatagramPacket(buf, buf.length);
+            while(!recvFlag && isConnected())
+            {
+                try
+                {
+                    sock.receive(packet);
+                    onReceive(client, new Packet(packet.getData()));
+                }
+                catch(IOException ex){}
+            }
+        });
+        
+        sock.connect(addr);
+    }
+    
+    @Override
     public synchronized void disconnect(boolean calledFirst)
     {
         if(!isConnected()) return;
@@ -108,15 +113,12 @@ public class ClientUdpManager extends ClientManager
         
         state = ConnectionState.DISCONNECTED_SESSION_CLOSED;
         System.out.println("] Disconnected.");
-        
-        recvThread.stop();
-        execThread.stop();
     }
     
     @Override
     public boolean isConnected()
     {
-        return sock.isConnected();
+        return sock != null && sock.isConnected();
     }
     
     @Override

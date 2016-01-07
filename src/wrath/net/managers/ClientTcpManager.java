@@ -5,11 +5,9 @@
 package wrath.net.managers;
 
 import java.io.IOException;
-import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.net.SocketException;
-import java.net.UnknownHostException;
 import wrath.net.Client;
 import wrath.net.ConnectionState;
 import wrath.net.Packet;
@@ -22,7 +20,7 @@ import wrath.util.MiscUtils;
  */
 public class ClientTcpManager extends ClientManager
 {
-    private final Socket sock = new Socket();
+    private Socket sock;
     
     /**
      * Constructor.
@@ -31,6 +29,13 @@ public class ClientTcpManager extends ClientManager
     public ClientTcpManager(Client client)
     {
         super(client);
+        state = ConnectionState.DISCONNECTED_IDLE;
+    }
+    
+    @Override
+    protected synchronized void createNewSocket(InetSocketAddress address) throws IOException
+    {
+        sock = new Socket();
         
         try
         {
@@ -48,7 +53,6 @@ public class ClientTcpManager extends ClientManager
             System.err.println("] Could not set TCP Socket properties! I/O Error!");
         }
         
-        state = ConnectionState.DISCONNECTED_IDLE;
         this.recvThread = new Thread(() ->
         {
             final byte[] buf = new byte[Client.getClientConfig().getInt("TcpRecvBufferSize", 512)];
@@ -72,43 +76,7 @@ public class ClientTcpManager extends ClientManager
             }
         });
         
-        execThread.setName("NetTcpClientExec");
-        execThread.setDaemon(true);
-        recvThread.setName("NetTcpClientRecv");
-        recvThread.setDaemon(true);
-    }
-    
-    @Override
-    public synchronized void connect(String ip, int port)
-    {
-        if(isConnected()) return;
-        
-        this.ip = ip;
-        this.port = port;
-        
-        state = ConnectionState.CONNECTING;
-        System.out.println("] Connecting to [" + ip + ":" + port + "]!");
-        
-        try
-        {
-            sock.connect(new InetSocketAddress(InetAddress.getByName(ip), port));
-            recvFlag = false;
-            recvThread.start();
-            execThread.start();
-            state = ConnectionState.CONNECTED;
-            System.out.println("] Connected to [" + ip + ":" + port + "]!");
-        }
-        catch(UnknownHostException e)
-        {
-            System.err.println("] Could not resolve hostname/ip [" + ip + "]!");
-            state = ConnectionState.DISCONNECTED_CONNECTION_FAILED;
-        }
-        catch(IOException ex)
-        {
-            System.err.println("] Could not connect to [" + ip + ":" + port + "]! I/O Error!");
-            state = ConnectionState.DISCONNECTED_CONNECTION_FAILED;
-        }
-        
+        sock.connect(address, Client.getClientConfig().getInt("TcpConnectingTimeout", 1000));
     }
     
     @Override
@@ -133,15 +101,12 @@ public class ClientTcpManager extends ClientManager
         
         state = ConnectionState.DISCONNECTED_SESSION_CLOSED;
         System.out.println("] Disconnected.");
-        
-        recvThread.stop();
-        execThread.stop();
     }
     
     @Override
     public boolean isConnected()
     {
-        return sock.isConnected() && !sock.isClosed();
+        return (sock != null && (sock.isConnected() && !sock.isClosed()));
     }
     
     @Override

@@ -4,7 +4,11 @@
  */
 package wrath.net.managers;
 
+import java.io.IOException;
 import java.io.Serializable;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
+import java.net.UnknownHostException;
 import java.util.ArrayList;
 import wrath.net.Client;
 import wrath.net.ConnectionState;
@@ -20,28 +24,10 @@ public abstract class ClientManager
 {
     protected Client client;
     protected String ip = "0.0.0.0";
-    protected int ping = -1;
     protected int port = 0;
     protected volatile boolean recvFlag = false;
     private final ArrayList<ReceivedEvent> execList = new ArrayList<>();
-    protected final Thread execThread = new Thread(() ->
-    {
-        while(!recvFlag)
-            if(!execList.isEmpty())
-            {
-                ReceivedEvent[] events = new ReceivedEvent[execList.size()];
-                execList.toArray(events);
-                execList.clear();
-                for(ReceivedEvent event : events)
-                {
-                    Packet p = event.packet;
-                    if(client.getSessionFlags().contains(SessionFlag.GZIP_COMPRESSION))  p = new Packet(MiscUtils.decompressData(p.getRawData(), MiscUtils.CompressionType.GZIP));
-                    else if(Client.getClientConfig().getBoolean("CheckForGZIPCompression", false)) if(MiscUtils.isGZIPCompressed(p.getRawData())) p = new Packet(MiscUtils.decompressData(p.getRawData(), MiscUtils.CompressionType.GZIP));
-                    if(p.getDataAsObject().equals(Packet.TERMINATION_CALL)) disconnect(false);
-                    event.client.getClientListener().onReceive(event.client, p);
-                }
-            }
-    });
+    protected Thread execThread;
     protected Thread recvThread;
     protected ConnectionState state = ConnectionState.DISCONNECTED_IDLE;
     
@@ -59,12 +45,73 @@ public abstract class ClientManager
      * @param ip The {@link java.lang.String} representation of the server's IP Address or Host Name.
      * @param port The port the server is listening on.
      */
-    public abstract void connect(String ip, int port);
+    public synchronized void connect(String ip, int port)
+    {
+        if(isConnected()) return;
+        
+        this.ip = ip;
+        this.port = port;
+        
+        state = ConnectionState.CONNECTING;
+        System.out.println("] Connecting to [" + ip + ":" + port + "]!");
+        
+        execThread = new Thread(() ->
+        {
+            while(!recvFlag)
+                if(!execList.isEmpty())
+                {
+                    ReceivedEvent[] events = new ReceivedEvent[execList.size()];
+                    execList.toArray(events);
+                    execList.clear();
+                    for(ReceivedEvent event : events)
+                    {
+                        Packet p = event.packet;
+                        if(client.getSessionFlags().contains(SessionFlag.GZIP_COMPRESSION))  p = new Packet(MiscUtils.decompressData(p.getRawData(), MiscUtils.CompressionType.GZIP));
+                        else if(Client.getClientConfig().getBoolean("CheckForGZIPCompression", false)) if(MiscUtils.isGZIPCompressed(p.getRawData())) p = new Packet(MiscUtils.decompressData(p.getRawData(), MiscUtils.CompressionType.GZIP));
+                        if(p.getDataAsObject().equals(Packet.TERMINATION_CALL)) disconnect(false);
+                        event.client.getClientListener().onReceive(event.client, p);
+                    }
+                }
+        });
+        
+        try
+        {
+            createNewSocket(new InetSocketAddress(InetAddress.getByName(ip), port));
+            
+            recvFlag = false;
+            recvThread.setName("NetClientRecvThread");
+            recvThread.setDaemon(true);
+            recvThread.start();
+            execThread.setName("NetClientExecThread");
+            execThread.setDaemon(true);
+            execThread.start();
+            
+            state = ConnectionState.CONNECTED;
+            System.out.println("] Connected to [" + ip + ":" + port + "]!");
+        }
+        catch(UnknownHostException e)
+        {
+            System.err.println("] Could not resolve hostname/ip [" + ip + "]!");
+            state = ConnectionState.DISCONNECTED_CONNECTION_FAILED;
+        }
+        catch(IOException e)
+        {
+            System.err.println("] Could not connect to [" + ip + ":" + port + "]! I/O Error!");
+            state = ConnectionState.DISCONNECTED_CONNECTION_FAILED;
+        }
+    }
+    
+    /**
+     * Method used by Client Managers to create a new Socket and Receiving Thread.
+     * @param address The {@link java.net.InetSocketAddress} representation of the Server the Client is connecting to.
+     * @throws java.io.IOException
+     */
+    protected abstract void createNewSocket(InetSocketAddress address) throws IOException;
     
     /**
      * Disconnects from the Server, if the Client is connected.
      */
-    public void disconnect()
+    public synchronized void disconnect()
     {
         disconnect(true);
     }
