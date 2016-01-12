@@ -7,13 +7,13 @@ package wrath.net.managers;
 import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
-import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.SocketException;
-import java.net.UnknownHostException;
 import wrath.net.Client;
 import wrath.net.ConnectionState;
 import wrath.net.Packet;
+import wrath.net.SessionFlag;
+import wrath.util.MiscUtils;
 
 /**
  * Class to manage Client Connections using UDP.
@@ -30,37 +30,7 @@ public class ClientUdpManager extends ClientManager
     public ClientUdpManager(Client client)
     {
         super(client);
-        
         state = ConnectionState.DISCONNECTED_IDLE;
-        
-    }
-    
-    @Override
-    public synchronized void connect(String ip, int port)
-    {
-        if(sock.isConnected()) return;
-        
-        this.ip = ip;
-        this.port = port;
-        
-        state = ConnectionState.BINDING_PORT;
-        System.out.println("] Connecting to [" + ip + ":" + port + "]!");
-        
-        try
-        {
-            sock.connect(InetAddress.getByName(ip), port);
-            recvFlag = false;
-            recvThread.start();
-            execThread.start();
-            state = ConnectionState.CONNECTED;
-            System.out.println("] Connected to [" + ip + ":" + port + "]!");
-            send("init");
-        }
-        catch(UnknownHostException ex)
-        {
-            System.err.println("] Could not resolve hostname/ip [" + ip + "]!");
-            state = ConnectionState.DISCONNECTED_CONNECTION_FAILED;
-        }
     }
     
     @Override
@@ -127,6 +97,7 @@ public class ClientUdpManager extends ClientManager
         if(isConnected())
             try
             {
+                if(client.getSessionFlags().contains(SessionFlag.GZIP_COMPRESSION)) data = MiscUtils.compressData(data);
                 DatagramPacket pack = new DatagramPacket(data, data.length);
                 sock.send(pack);
             }
