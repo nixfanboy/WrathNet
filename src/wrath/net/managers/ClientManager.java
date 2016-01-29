@@ -66,10 +66,10 @@ public abstract class ClientManager
                     for(ReceivedEvent event : events)
                     {
                         Packet p = event.packet;
-                        if(client.getSessionFlags().contains(SessionFlag.GZIP_COMPRESSION))  p = new Packet(MiscUtils.decompressData(p.getRawData(), MiscUtils.CompressionType.GZIP));
+                        if(client.getSessionFlags().contains(SessionFlag.GZIP_COMPRESSION) && MiscUtils.isGZIPCompressed(p.getRawData()))  p = new Packet(MiscUtils.decompressData(p.getRawData(), MiscUtils.CompressionType.GZIP));
                         else if(Client.getClientConfig().getBoolean("CheckForGZIPCompression", false)) if(MiscUtils.isGZIPCompressed(p.getRawData())) p = new Packet(MiscUtils.decompressData(p.getRawData(), MiscUtils.CompressionType.GZIP));
                         if(p.getDataAsObject().equals(Packet.TERMINATION_CALL)) disconnect(false);
-                        event.client.getClientListener().onReceive(event.client, p);
+                        else event.client.getClientListener().onReceive(event.client, p);
                     }
                 }
         });

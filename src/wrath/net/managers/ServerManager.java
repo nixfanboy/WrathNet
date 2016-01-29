@@ -62,7 +62,7 @@ public abstract class ServerManager
                 for(ServerReceivedEvent event : events)
                 {
                     Packet p = event.packet;
-                    if(server.getSessionFlags().contains(SessionFlag.GZIP_COMPRESSION))  p = new Packet(MiscUtils.decompressData(p.getRawData(), MiscUtils.CompressionType.GZIP));
+                    if(server.getSessionFlags().contains(SessionFlag.GZIP_COMPRESSION) && MiscUtils.isGZIPCompressed(p.getRawData()))  p = new Packet(MiscUtils.decompressData(p.getRawData(), MiscUtils.CompressionType.GZIP));
                     else if(Server.getServerConfig().getBoolean("CheckForGZIPCompression", false)) if(MiscUtils.isGZIPCompressed(p.getRawData())) p = new Packet(MiscUtils.decompressData(p.getRawData(), MiscUtils.CompressionType.GZIP));
                     if(p.getDataAsObject().equals(Packet.TERMINATION_CALL)) disconnectClient(event.client, false);
                     else event.client.getServer().getServerListener().onReceive(event.client, p);
