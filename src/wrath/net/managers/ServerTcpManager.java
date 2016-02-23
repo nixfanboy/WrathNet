@@ -1,6 +1,6 @@
 /**
  * The MIT License (MIT)
- * Wrath Net Engine Copyright (c) 2015 Trent Spears
+ * Wrath Net Engine Copyright (c) 2016 Trent Spears
  */
 package wrath.net.managers;
 

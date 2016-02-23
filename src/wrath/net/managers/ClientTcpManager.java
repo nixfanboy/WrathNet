@@ -1,6 +1,6 @@
 /**
  * The MIT License (MIT)
- * Wrath Net Engine Copyright (c) 2015 Trent Spears
+ * Wrath Net Engine Copyright (c) 2016 Trent Spears
  */
 package wrath.net.managers;
 
@@ -12,7 +12,7 @@ import wrath.net.Client;
 import wrath.net.ConnectionState;
 import wrath.net.Packet;
 import wrath.net.SessionFlag;
-import wrath.util.MiscUtils;
+import wrath.util.Compression;
 
 /**
  * Class to manage Client Connections using TCP.
@@ -39,11 +39,11 @@ public class ClientTcpManager extends ClientManager
         
         try
         {
-            sock.setSoTimeout(Client.getClientConfig().getInt("TcpTimeout", 500));
+            sock.setSoTimeout(Client.getClientConfig().getInt("Timeout", 500));
             sock.setKeepAlive(Client.getClientConfig().getBoolean("TcpKeepAlive", false));
             sock.setTcpNoDelay(Client.getClientConfig().getBoolean("TcpNoDelay", true));
-            sock.setReceiveBufferSize(Client.getClientConfig().getInt("TcpProtocolRecvBufferSize", sock.getReceiveBufferSize()));
-            sock.setSendBufferSize(Client.getClientConfig().getInt("TcpProtocolSendBufferSize", sock.getSendBufferSize()));
+            sock.setReceiveBufferSize(Client.getClientConfig().getInt("TcpRecvBufferSize", sock.getReceiveBufferSize()));
+            sock.setSendBufferSize(Client.getClientConfig().getInt("TcpSendBufferSize", sock.getSendBufferSize()));
             sock.setReuseAddress(Client.getClientConfig().getBoolean("TcpReuseAddress", true));
             sock.setTrafficClass(Client.getClientConfig().getInt("TcpTrafficClass", sock.getTrafficClass()));
             sock.setOOBInline(Client.getClientConfig().getBoolean("TcpOobInline", sock.getOOBInline()));
@@ -55,7 +55,7 @@ public class ClientTcpManager extends ClientManager
         
         this.recvThread = new Thread(() ->
         {
-            final byte[] buf = new byte[Client.getClientConfig().getInt("TcpRecvBufferSize", 512)];
+            final byte[] buf = new byte[Client.getClientConfig().getInt("TcpRecvArraySize", 512)];
             byte[] rbuf;
             while(isConnected() && !recvFlag)
             {
@@ -115,7 +115,7 @@ public class ClientTcpManager extends ClientManager
         if(client.isConnected()) 
             try 
             {
-                if(client.getSessionFlags().contains(SessionFlag.GZIP_COMPRESSION)) data = MiscUtils.compressData(data);
+                if(client.getSessionFlags().contains(SessionFlag.GZIP_COMPRESSION)) data = Compression.compressData(data);
                 sock.getOutputStream().write(data);
                 sock.getOutputStream().flush();
             }

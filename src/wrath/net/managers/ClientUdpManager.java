@@ -1,6 +1,6 @@
 /**
  * The MIT License (MIT)
- * Wrath Net Engine Copyright (c) 2015 Trent Spears
+ * Wrath Net Engine Copyright (c) 2016 Trent Spears
  */
 package wrath.net.managers;
 
@@ -13,7 +13,7 @@ import wrath.net.Client;
 import wrath.net.ConnectionState;
 import wrath.net.Packet;
 import wrath.net.SessionFlag;
-import wrath.util.MiscUtils;
+import wrath.util.Compression;
 
 /**
  * Class to manage Client Connections using UDP.
@@ -39,10 +39,10 @@ public class ClientUdpManager extends ClientManager
         try
         {
             this.sock = new DatagramSocket();
-            sock.setSoTimeout(Client.getClientConfig().getInt("UdpTimeout", 500));
-            sock.setReceiveBufferSize(Client.getClientConfig().getInt("UdpProtocolRecvBufferSize", sock.getReceiveBufferSize()));
-            sock.setBroadcast(Client.getClientConfig().getBoolean("UdpSoBroadcast", sock.getBroadcast()));
-            sock.setSendBufferSize(Client.getClientConfig().getInt("UdpProtocolSendBufferSize", sock.getSendBufferSize()));
+            sock.setSoTimeout(Client.getClientConfig().getInt("Timeout", 500));
+            sock.setReceiveBufferSize(Client.getClientConfig().getInt("UdpRecvBufferSize", sock.getReceiveBufferSize()));
+            sock.setBroadcast(Client.getClientConfig().getBoolean("UdpSBroadcast", sock.getBroadcast()));
+            sock.setSendBufferSize(Client.getClientConfig().getInt("UdpSendBufferSize", sock.getSendBufferSize()));
             sock.setReuseAddress(Client.getClientConfig().getBoolean("UdpReuseAddress", sock.getReuseAddress()));
             sock.setTrafficClass(Client.getClientConfig().getInt("UdpTrafficClass", sock.getTrafficClass()));
         }
@@ -53,7 +53,7 @@ public class ClientUdpManager extends ClientManager
         
         this.recvThread = new Thread(() ->
         {
-            final byte[] buf = new byte[Client.getClientConfig().getInt("UdpRecvBufferSize", 512)];
+            final byte[] buf = new byte[Client.getClientConfig().getInt("UdpRecvArraySize", 512)];
             final DatagramPacket packet = new DatagramPacket(buf, buf.length);
             while(!recvFlag && isConnected())
             {
@@ -97,7 +97,7 @@ public class ClientUdpManager extends ClientManager
         if(isConnected())
             try
             {
-                if(client.getSessionFlags().contains(SessionFlag.GZIP_COMPRESSION)) data = MiscUtils.compressData(data);
+                if(client.getSessionFlags().contains(SessionFlag.GZIP_COMPRESSION)) data = Compression.compressData(data);
                 DatagramPacket pack = new DatagramPacket(data, data.length);
                 sock.send(pack);
             }

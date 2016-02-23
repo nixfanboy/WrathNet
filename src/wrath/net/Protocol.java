@@ -1,6 +1,6 @@
 /**
  * The MIT License (MIT)
- * Wrath Net Engine Copyright (c) 2015 Trent Spears
+ * Wrath Net Engine Copyright (c) 2016 Trent Spears
  */
 package wrath.net;
 
@@ -16,6 +16,13 @@ public enum Protocol
      * @see java.net.ServerSocket
      */
     TCP,
+    /**
+     * Reliable User Datagram Protocol (UNDER CONSTRUCTION, DEFUNCT).
+     * Built off of, and backwards compatible with, User Datagram Protocol.
+     * Same as UDP, but ensures that received packets are in order.
+     * @see wrath.net.Protocol#UDP
+     */
+    RUDP,
     /**
      * User Datagram Protocol.
      * @see java.net.DatagramPacket
