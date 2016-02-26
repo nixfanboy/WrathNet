@@ -21,7 +21,7 @@ import wrath.util.Config;
  */
 public class Server 
 {
-    private static final Config serverCfg = new Config(new File("netserver.cfg"));
+    private static final Config SERVER_CFG = new Config(new File("netserver.cfg"));
     
     private final HashSet<SessionFlag> flags = new HashSet<>();
     private ServerListener listener;
@@ -154,16 +154,7 @@ public class Server
      */
     public static Config getServerConfig()
     {
-        return serverCfg;
-    }
-    
-    /**
-     * Gets the list of {@link wrath.net.SessionFlag}s that change the way the connection is established.
-     * @return Returns the list of {@link wrath.net.SessionFlag}s that change the way the connection is established.
-     */
-    public Collection<SessionFlag> getSessionFlags()
-    {
-        return flags;
+        return SERVER_CFG;
     }
     
     /**
@@ -173,6 +164,24 @@ public class Server
     public ServerListener getServerListener()
     {
         return listener;
+    }
+    
+    /**
+     * Gets the {@link wrath.net.managers.ServerManager} linked to this Server.
+     * @return Returns the {@link wrath.net.managers.ServerManager} linked to this Server.
+     */
+    public ServerManager getServerManager()
+    {
+        return man;
+    }
+    
+    /**
+     * Gets the list of {@link wrath.net.SessionFlag}s that change the way the connection is established.
+     * @return Returns the list of {@link wrath.net.SessionFlag}s that change the way the connection is established.
+     */
+    public Collection<SessionFlag> getSessionFlags()
+    {
+        return flags;
     }
     
     /**

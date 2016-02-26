@@ -35,8 +35,10 @@ public class ClientTcpManager extends ClientManager
     @Override
     protected synchronized void createNewSocket(InetSocketAddress address) throws IOException
     {
+        // Define Object
         sock = new Socket();
         
+        // Set Object Properties
         try
         {
             sock.setSoTimeout(Client.getClientConfig().getInt("Timeout", 500));
@@ -53,6 +55,7 @@ public class ClientTcpManager extends ClientManager
             System.err.println("] Could not set TCP Socket properties! I/O Error!");
         }
         
+        // Define Receive Thread
         this.recvThread = new Thread(() ->
         {
             final byte[] buf = new byte[Client.getClientConfig().getInt("TcpRecvArraySize", 512)];
@@ -76,18 +79,23 @@ public class ClientTcpManager extends ClientManager
             }
         });
         
+        // Connect
         sock.connect(address, Client.getClientConfig().getInt("TcpConnectingTimeout", 1000));
     }
     
     @Override
     public synchronized void disconnect(boolean calledFirst)
     {
+        // Check if still connected
         if(!isConnected()) return;
+        // Signal other threads to stop
         recvFlag = true;
+        // Check for the disconnect signal if Server is dropping this client. Otherwise send disconnect signal to Server.
         if(!calledFirst) System.out.println("] Received disconnect signal from host.");
         else send(new Packet(Packet.TERMINATION_CALL));
         System.out.println("] Disconnecting from [" + ip + ":" + port + "]!");
         
+        // Close objects
         try
         {
             sock.close();
@@ -99,8 +107,18 @@ public class ClientTcpManager extends ClientManager
             return;
         }
         
+        // Set State
         state = ConnectionState.DISCONNECTED_SESSION_CLOSED;
         System.out.println("] Disconnected.");
+    }
+    
+    /**
+     * Gets the {@link java.net.Socket} used by this Client.
+     * @return Returns the {@link java.net.Socket} used by this Client.
+     */
+    public Socket getRawSocket()
+    {
+        return sock;
     }
     
     @Override
@@ -115,7 +133,13 @@ public class ClientTcpManager extends ClientManager
         if(client.isConnected()) 
             try 
             {
+                // Compression
                 if(client.getSessionFlags().contains(SessionFlag.GZIP_COMPRESSION)) data = Compression.compressData(data);
+                
+                // Encryption
+                //      TODO: Encryption
+                
+                // Send data
                 sock.getOutputStream().write(data);
                 sock.getOutputStream().flush();
             }

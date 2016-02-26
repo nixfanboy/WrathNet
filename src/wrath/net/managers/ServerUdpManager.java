@@ -15,6 +15,8 @@ import wrath.net.ConnectionState;
 import wrath.net.Packet;
 import wrath.net.Server;
 import wrath.net.ServerClient;
+import wrath.net.SessionFlag;
+import wrath.util.Compression;
 
 /**
  * Class to manage Server Connections using UDP.
@@ -122,6 +124,15 @@ public class ServerUdpManager extends ServerManager
         System.out.println("] Client " + client.getClientIdentifier() + " Disconnected. ConnectionTime: " + ((double)(System.nanoTime() - client.getJoinTime())/1000000000) + "s");
     }
     
+    /**
+     * Gets the {@link java.net.DatagramSocket} used by this Server.
+     * @return Returns the {@link java.net.DatagramSocket} used by this Server.
+     */
+    public DatagramSocket getRawSocket()
+    {
+        return svr;
+    }
+    
     @Override
     public boolean isBound()
     {
@@ -136,8 +147,14 @@ public class ServerUdpManager extends ServerManager
         {
             try
             {
-                DatagramPacket pack = new DatagramPacket(data, data.length, client.getAddress(), client.getPort());
-                svr.send(pack);
+                // Compression
+                if(server.getSessionFlags().contains(SessionFlag.GZIP_COMPRESSION)) data = Compression.compressData(data, Compression.CompressionType.GZIP);
+                
+                // Encryption
+                //      TODO: Encryption
+                
+                // Send data
+                svr.send(new DatagramPacket(data, data.length, client.getAddress(), client.getPort()));
             }
             catch(IOException ex)
             {
@@ -165,8 +182,5 @@ public class ServerUdpManager extends ServerManager
         
         state = ConnectionState.SOCKET_CLOSED;
         System.out.println("] ServerSocket Closed.");
-        
-        recvThread.stop();
-        execThread.stop();
     }
 }

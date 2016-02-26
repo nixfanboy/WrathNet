@@ -13,6 +13,8 @@ import wrath.net.ConnectionState;
 import wrath.net.Packet;
 import wrath.net.Server;
 import wrath.net.ServerClient;
+import wrath.net.SessionFlag;
+import wrath.util.Compression;
 
 /**
  * Class to manage Server Connections using TCP.
@@ -30,6 +32,8 @@ public class ServerTcpManager extends ServerManager
     public ServerTcpManager(Server server)
     {
         super(server);
+        
+        // Define Objects
         try
         {
             this.svr = new ServerSocket();
@@ -38,7 +42,11 @@ public class ServerTcpManager extends ServerManager
         {
             System.err.println("] I/O Error occured while creating ServerSocket object. Cannot create server.");
         }
+        
+        // Set State
         state = ConnectionState.SOCKET_NOT_BOUND;
+        
+        // Define Receive Thread
         this.recvThread = new Thread(() ->
         {
             while(server.isBound() && !recvFlag)
@@ -61,10 +69,8 @@ public class ServerTcpManager extends ServerManager
                         {
                             try
                             {
-                                while(s.getInputStream().available() < 1 && !s.isClosed()) continue;
-                                if(s.isClosed()) break;
                                 int len = s.getInputStream().read(buf);
-                                if(len < 1) break;
+                                if(len < 1 || s.isClosed()) break;
                                 rbuf = new byte[len];
                                 System.arraycopy(buf, 0, rbuf, 0, len);
                             }
@@ -95,6 +101,7 @@ public class ServerTcpManager extends ServerManager
             }
         });
         
+        // Set Thread Properties
         recvThread.setName("NetTcpServerRecv");
         execThread.setName("NetTcpServerExec");
         execThread.setDaemon(true);
@@ -103,15 +110,21 @@ public class ServerTcpManager extends ServerManager
     @Override
     public synchronized void bindSocket(String ip, int port)
     {
+        // Check if Bound
         if(isBound()) return;
         
+        // Set IP and Port
         if(ip == null) ip = "*";
         this.ip = ip;
         this.port = port;
         
+        // Reset Flag
         recvFlag = false;
+        
+        // Set State
         state = ConnectionState.BINDING_PORT;
         
+        // Bind Socket
         int backlog = Server.getServerConfig().getInt("TcpBacklog", 0);
         if(backlog == 0)
         {
@@ -145,6 +158,7 @@ public class ServerTcpManager extends ServerManager
             }
         }
 
+        // Check for Errors, Set State
         if(!isBound())
         {
             System.err.println("] Could not bind ServerSocket to [" + ip + ":" + port + "]! UNKNOWN Error!");
@@ -152,6 +166,7 @@ public class ServerTcpManager extends ServerManager
         }
         else state = ConnectionState.LISTENING;
         
+        // Start Threads
         recvThread.start();
         execThread.start();
     }
@@ -187,6 +202,15 @@ public class ServerTcpManager extends ServerManager
         System.out.println("] Client " + client.getClientIdentifier() + " Disconnected. ConnectionTime: " + ((double)(System.nanoTime() - client.getJoinTime())/1000000000) + "s");
     }
     
+    /**
+     * Gets the {@link java.net.ServerSocket} used by this Server.
+     * @return Returns the {@link java.net.ServerSocket} used by this Server.
+     */
+    public ServerSocket getRawSocket()
+    {
+        return svr;
+    }
+    
     @Override
     public boolean isBound()
     {
@@ -200,7 +224,14 @@ public class ServerTcpManager extends ServerManager
         {
             Socket s = clientToSock.get(client);
             try
-            {
+            {   
+                // Compression
+                if(server.getSessionFlags().contains(SessionFlag.GZIP_COMPRESSION)) data = Compression.compressData(data, Compression.CompressionType.GZIP);
+                
+                // Encryption
+                //      TODO: Encryption
+                
+                // Send data
                 s.getOutputStream().write(data);
                 s.getOutputStream().flush();
             }
@@ -238,8 +269,5 @@ public class ServerTcpManager extends ServerManager
         
         state = ConnectionState.SOCKET_CLOSED;
         System.out.println("] ServerSocket Closed.");
-        
-        recvThread.stop();
-        execThread.stop();
     }
 }

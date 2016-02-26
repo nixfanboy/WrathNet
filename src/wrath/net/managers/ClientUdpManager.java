@@ -38,7 +38,9 @@ public class ClientUdpManager extends ClientManager
     {
         try
         {
+            // Define Object
             this.sock = new DatagramSocket();
+            // Set Object Properties
             sock.setSoTimeout(Client.getClientConfig().getInt("Timeout", 500));
             sock.setReceiveBufferSize(Client.getClientConfig().getInt("UdpRecvBufferSize", sock.getReceiveBufferSize()));
             sock.setBroadcast(Client.getClientConfig().getBoolean("UdpSBroadcast", sock.getBroadcast()));
@@ -51,6 +53,7 @@ public class ClientUdpManager extends ClientManager
             System.err.println("] Could not bind UDP Socket! Socket Error!");
         }
         
+        // Define Receive Thread
         this.recvThread = new Thread(() ->
         {
             final byte[] buf = new byte[Client.getClientConfig().getInt("UdpRecvArraySize", 512)];
@@ -66,23 +69,38 @@ public class ClientUdpManager extends ClientManager
             }
         });
         
+        // Connect
         sock.connect(addr);
     }
     
     @Override
     public synchronized void disconnect(boolean calledFirst)
     {
+        // Check if still connected
         if(!isConnected()) return;
+        // Signal other threads to stop
         recvFlag = true;
+        // Check for the disconnect signal if Server is dropping this client. Otherwise send disconnect signal to Server.
         if(!calledFirst) System.out.println("] Received disconnect signal from host.");
         else send(new Packet(Packet.TERMINATION_CALL));
         System.out.println("] Disconnecting from [" + ip + ":" + port + "]!");
         
+        // Close objects
         sock.disconnect();
         sock.close();
         
+        // Set State
         state = ConnectionState.DISCONNECTED_SESSION_CLOSED;
         System.out.println("] Disconnected.");
+    }
+    
+    /**
+     * Gets the {@link java.net.DatagramSocket} used by this Client.
+     * @return Returns the {@link java.net.DatagramSocket} used by this Client.
+     */
+    public DatagramSocket getRawSocket()
+    {
+        return sock;
     }
     
     @Override
@@ -97,9 +115,14 @@ public class ClientUdpManager extends ClientManager
         if(isConnected())
             try
             {
+                // Compression
                 if(client.getSessionFlags().contains(SessionFlag.GZIP_COMPRESSION)) data = Compression.compressData(data);
-                DatagramPacket pack = new DatagramPacket(data, data.length);
-                sock.send(pack);
+                
+                // Encryption
+                //      TODO: Encryption
+                
+                // Send data
+                sock.send(new DatagramPacket(data, data.length));
             }
             catch(IOException ex)
             {

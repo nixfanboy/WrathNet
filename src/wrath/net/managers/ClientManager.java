@@ -47,14 +47,18 @@ public abstract class ClientManager
      */
     public synchronized void connect(String ip, int port)
     {
+        // Check if connected
         if(isConnected()) return;
         
+        // Set IP and Port to track connection
         this.ip = ip;
         this.port = port;
         
+        // Set State
         state = ConnectionState.CONNECTING;
         System.out.println("] Connecting to [" + ip + ":" + port + "]!");
         
+        // Define Execution Thread
         execThread = new Thread(() ->
         {
             while(!recvFlag)
@@ -66,8 +70,16 @@ public abstract class ClientManager
                     for(ReceivedEvent event : events)
                     {
                         Packet p = event.packet;
-                        if(client.getSessionFlags().contains(SessionFlag.GZIP_COMPRESSION) && Compression.isGZIPCompressed(p.getRawData()))  p = new Packet(Compression.decompressData(p.getRawData(), Compression.CompressionType.GZIP));
-                        else if(Client.getClientConfig().getBoolean("CheckForGZIPCompression", false)) if(Compression.isGZIPCompressed(p.getRawData())) p = new Packet(Compression.decompressData(p.getRawData(), Compression.CompressionType.GZIP));
+                        // Decrypt
+                        //     TODO: Decryption
+                        
+                        // Decompress
+                        if(client.getSessionFlags().contains(SessionFlag.GZIP_COMPRESSION))  
+                            p.decompress(Compression.CompressionType.GZIP);
+                        else if(Client.getClientConfig().getBoolean("CheckForGZIPCompression", false) && Compression.isGZIPCompressed(p.getRawData())) 
+                            p.decompress(Compression.CompressionType.GZIP);
+                        
+                        // Check if TERMINATION_CALL packet. Pushes event to Listener if not.
                         if(p.getDataAsObject().equals(Packet.TERMINATION_CALL)) disconnect(false);
                         else event.client.getClientListener().onReceive(event.client, p);
                     }
@@ -76,9 +88,12 @@ public abstract class ClientManager
         
         try
         {
+            // Create the Socket
             createNewSocket(new InetSocketAddress(InetAddress.getByName(ip), port));
             
+            // Reset Flag
             recvFlag = false;
+            // Manage Threads
             recvThread.setName("NetClientRecvThread");
             recvThread.setDaemon(true);
             recvThread.start();
@@ -86,6 +101,7 @@ public abstract class ClientManager
             execThread.setDaemon(true);
             execThread.start();
             
+            // Set State
             state = ConnectionState.CONNECTED;
             System.out.println("] Connected to [" + ip + ":" + port + "]!");
         }
