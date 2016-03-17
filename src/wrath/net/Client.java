@@ -10,6 +10,7 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashSet;
 import wrath.net.managers.ClientManager;
+import wrath.net.managers.ClientRudpManager;
 import wrath.net.managers.ClientTcpManager;
 import wrath.net.managers.ClientUdpManager;
 import wrath.util.Config;
@@ -44,7 +45,7 @@ public class Client
      * @param listener The {@link wrath.net.ClientListener} to report received data to.
      * @param flags List of {@link wrath.net.SessionFlag}s to change the way the connection is established.
      */
-    public Client(Protocol protocol, ClientListener listener, SessionFlag[] flags)
+    public Client(Protocol protocol, ClientListener listener, SessionFlag...flags)
     {
         this(protocol, listener, Arrays.asList(flags));
     }
@@ -62,7 +63,8 @@ public class Client
         this.flags.addAll(flags);
         
         if(proto == Protocol.TCP) man = new ClientTcpManager(this);
-        else man = new ClientUdpManager(this);
+        else if(proto == Protocol.UDP) man = new ClientUdpManager(this);
+        else man = new ClientRudpManager(this);
     }
     
     /**
@@ -77,12 +79,32 @@ public class Client
     }
     
     /**
+     * If data encryption was enabled, it is now disabled.
+     * WARNING: If the Server has encryption enabled then this Client will not be able to send/receive proper data from the Server.
+     */
+    public void disableDataEncryption()
+    {
+        man.disableDataEncryption();
+    }
+    
+    /**
      * Disconnects the client from any previously established connections.
      * @see wrath.net.managers.ClientManager#disconnect()
      */
     public void disconnect()
     {
         man.disconnect();
+    }
+    
+    /**
+     * Enables all data going through this Client->Server connection to be encrypted/decrypted with the specified phrase/key.
+     * @param passphrase The passphrase or key that must be at least 128-bit. No length limit below theoretical String length limit.
+     * WARNING: The Server and Client must both have encryption enabled with the same passphrase/key.
+     * WARNING: Enabling this process will slow the connection noticeably.
+     */
+    public void enableDataEncryption(String passphrase)
+    {
+        man.enableDataEncryption(passphrase);
     }
     
     /**
@@ -101,6 +123,15 @@ public class Client
     public ClientListener getClientListener()
     {
         return listener;
+    }
+    
+    /**
+     * Gets the implementation layer object, the {@link wrath.net.managers.ClientManager}, of this Client.
+     * @return Returns the implementation layer object, the {@link wrath.net.managers.ClientManager}, of this Client.
+     */
+    public ClientManager getClientManager()
+    {
+        return man;
     }
     
     /**
@@ -166,7 +197,7 @@ public class Client
     
     /**
      * Sends data to the Server the Client is connected to, if it is connected.
-     * @see wrath.net.managers.ClientManager#send(java.io.Serializable) 
+     * @see wrath.net.managers.ClientManager#send(java.io.Serializable)
      * @param object The data to send to the Server.
      */
     public void send(Serializable object)
@@ -176,7 +207,7 @@ public class Client
     
     /**
      * Sends data to the Server the Client is connected to, if it is connected.
-     * @see wrath.net.managers.ClientManager#send(wrath.net.Packet) 
+     * @see wrath.net.managers.ClientManager#send(wrath.net.Packet)
      * @param packet The {@link wrath.net.Packet} containing the data to send to the Server.
      */
     public void send(Packet packet)

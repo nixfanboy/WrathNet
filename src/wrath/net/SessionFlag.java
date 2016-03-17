@@ -13,8 +13,7 @@ public enum SessionFlag
     /**
      * Enables the use of network compression using the GZIP format.
      * It is only recommended to use this if Packets are being sent with large amounts of data at a time.
-     * Enabling this flag on a Server forces all Clients to enable this flag.
-     * If the Server's flags cannot be retrieved, the Client flags would take priority.
+     * Enabling this flag on a Server requires all Clients to also have this flag enabled.
      * This can be used for any protocol.
      */
     GZIP_COMPRESSION,
@@ -27,8 +26,7 @@ public enum SessionFlag
     /**
      * Enables the use of Secure Socket Layers for TCP Connections.
      * This will slow down the connection severely, but also encrypt the messages being sent/received.
-     * Enabling this flag on a Server forces all Clients to enable this flag.
-     * If the Server's flags cannot be retrieved, the Client flags would take priority.
+     * Enabling this flag on a Server requires all Clients to also have this flag enabled.
      * This can only be used with the TCP protocol.
      */
     USE_SSL;

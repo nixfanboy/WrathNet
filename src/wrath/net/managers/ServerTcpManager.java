@@ -13,8 +13,6 @@ import wrath.net.ConnectionState;
 import wrath.net.Packet;
 import wrath.net.Server;
 import wrath.net.ServerClient;
-import wrath.net.SessionFlag;
-import wrath.util.Compression;
 
 /**
  * Class to manage Server Connections using TCP.
@@ -32,7 +30,6 @@ public class ServerTcpManager extends ServerManager
     public ServerTcpManager(Server server)
     {
         super(server);
-        
         // Define Objects
         try
         {
@@ -43,13 +40,10 @@ public class ServerTcpManager extends ServerManager
             System.err.println("] I/O Error occured while creating ServerSocket object. Cannot create server.");
         }
         
-        // Set State
-        state = ConnectionState.SOCKET_NOT_BOUND;
-        
         // Define Receive Thread
         this.recvThread = new Thread(() ->
         {
-            while(server.isBound() && !recvFlag)
+            while(isBound() && !recvFlag)
             {
                 try
                 {
@@ -63,7 +57,7 @@ public class ServerTcpManager extends ServerManager
                         
                         onClientConnect(c);
                         
-                        final byte[] buf = new byte[Server.getServerConfig().getInt("TcpClientRecvBufferSize", 512)];
+                        final byte[] buf = new byte[Server.getServerConfig().getInt("TcpClientRecvBufferSize", 1024)];
                         byte[] rbuf;
                         while(!recvFlag)
                         {
@@ -108,23 +102,21 @@ public class ServerTcpManager extends ServerManager
     }
 
     @Override
-    public synchronized void bindSocket(String ip, int port)
+    protected synchronized void closeSocket()
     {
-        // Check if Bound
-        if(isBound()) return;
-        
-        // Set IP and Port
-        if(ip == null) ip = "*";
-        this.ip = ip;
-        this.port = port;
-        
-        // Reset Flag
-        recvFlag = false;
-        
-        // Set State
-        state = ConnectionState.BINDING_PORT;
-        
-        // Bind Socket
+        try
+        {
+            svr.close();
+        }
+        catch(IOException ex)
+        {
+            System.err.println("] Error while closing Server Socket! I/O Error!");
+        }
+    }
+    
+    @Override
+    protected synchronized void createSocket(String ip, int port)
+    {
         int backlog = Server.getServerConfig().getInt("TcpBacklog", 0);
         if(backlog == 0)
         {
@@ -157,51 +149,8 @@ public class ServerTcpManager extends ServerManager
                 return;
             }
         }
-
-        // Check for Errors, Set State
-        if(!isBound())
-        {
-            System.err.println("] Could not bind ServerSocket to [" + ip + ":" + port + "]! UNKNOWN Error!");
-            state = ConnectionState.SOCKET_NOT_BOUND_ERROR;
-        }
-        else state = ConnectionState.LISTENING;
-        
-        // Start Threads
-        recvThread.start();
-        execThread.start();
     }
 
-    @Override
-    public synchronized void disconnectClient(ServerClient client, boolean calledFirst)
-    {
-        if(!clientToSock.containsKey(client)) return;
-        Socket s = clientToSock.get(client);
-        if(calledFirst)
-        {
-            System.out.println("] Disconnecting Client " + client.getClientIdentifier() + ".");
-            if(s != null) client.send(Packet.TERMINATION_CALL);
-        }
-        else System.out.println("] Client " + client.getClientIdentifier() + " Disconnecting.");
-        clients.remove(client);
-        clientToSock.remove(client);
-        
-        onClientDisconnect(client);
-        
-        try
-        {
-            if(s != null)
-            {
-                s.shutdownInput();
-                s.close();
-            }
-        }
-        catch(IOException ex)
-        {
-            System.err.println("] Could not close connection from " + client.getClientIdentifier() + "! I/O Error!");
-        }
-        System.out.println("] Client " + client.getClientIdentifier() + " Disconnected. ConnectionTime: " + ((double)(System.nanoTime() - client.getJoinTime())/1000000000) + "s");
-    }
-    
     /**
      * Gets the {@link java.net.ServerSocket} used by this Server.
      * @return Returns the {@link java.net.ServerSocket} used by this Server.
@@ -218,20 +167,13 @@ public class ServerTcpManager extends ServerManager
     }
 
     @Override
-    public synchronized void send(ServerClient client, byte[] data)
+    protected synchronized void pushData(ServerClient client, byte[] data)
     {
         if(clientToSock.containsKey(client))
         {
             Socket s = clientToSock.get(client);
             try
-            {   
-                // Compression
-                if(server.getSessionFlags().contains(SessionFlag.GZIP_COMPRESSION)) data = Compression.compressData(data, Compression.CompressionType.GZIP);
-                
-                // Encryption
-                //      TODO: Encryption
-                
-                // Send data
+            {
                 s.getOutputStream().write(data);
                 s.getOutputStream().flush();
             }
@@ -244,30 +186,22 @@ public class ServerTcpManager extends ServerManager
     }
     
     @Override
-    public synchronized void unbindSocket()
+    protected synchronized void removeClient(ServerClient client)
     {
-        if(!isBound()) return;
-        System.out.println("] Closing ServerSocket.");
-        
-        ServerClient[] clis = new ServerClient[clients.size()];
-        clients.toArray(clis);
-        for(ServerClient c : clis)
-            if(c.isConnected()) c.disconnectClient();
-        clients.clear();
-        
-        recvFlag = true;
-        
+        if(!clientToSock.containsKey(client)) return;
+        Socket s = clientToSock.get(client);
+        clientToSock.remove(client);
         try
         {
-            svr.close();
+            if(s != null)
+            {
+                s.shutdownInput();
+                s.close();
+            }
         }
         catch(IOException ex)
         {
-            System.err.println("] Error while closing Server Socket! I/O Error!");
-            state = ConnectionState.SOCKET_CLOSED;
+            System.err.println("] Could not close connection from " + client.getClientIdentifier() + "! I/O Error!");
         }
-        
-        state = ConnectionState.SOCKET_CLOSED;
-        System.out.println("] ServerSocket Closed.");
     }
 }

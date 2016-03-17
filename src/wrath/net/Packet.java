@@ -10,7 +10,6 @@ import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.Serializable;
-import wrath.util.Compression;
 
 /**
  * Class used to transport and convert raw byte data to other kinds of data.
@@ -19,7 +18,7 @@ import wrath.util.Compression;
  */
 public class Packet
 {
-    public static final String TERMINATION_CALL = "__session__end__disconnect__req__";
+    public static final String TERMINATION_CALL = (char) 0 + "session" + (char) 0 + "end" + (char) 0 + "disconnect" + (char) 0 + "req";
     
     private byte[] data = new byte[0];
     private transient Object dataAsObj = null;
@@ -80,47 +79,6 @@ public class Packet
     }
     
     /**
-     * Compresses the data in this packet in the GZIP format.
-     * WARNING: If the receiving end does not configured to detect compression/expect compression, it will be interpreted as corrupted!
-     * Compression detection is disabled by default for performance reasons.
-     */
-    public void compress()
-    {
-        compress(Compression.CompressionType.GZIP);
-    }
-    
-    /**
-     * Compresses the data in this packet in the specified format.
-     * WARNING: If the receiving end does not configured to detect compression/expect compression, it will be interpreted as corrupted!
-     * Compression detection currently only works in the GZIP format, and detection is disabled by default for performance reasons.
-     * @param format The {@link wrath.util.Compression.CompressionType} to use on the data.
-     */
-    public void compress(Compression.CompressionType format)
-    {
-        data = Compression.compressData(data, format);
-    }
-    
-    /**
-     * Decompresses the data in this packet in the GZIP format.
-     * WARNING: If the data is not compressed, it may be corrupted by this method!
-     */
-    public void decompress()
-    {
-        decompress(Compression.CompressionType.GZIP);
-    }
-    
-    /**
-     * Decompresses the data in this packet in the specified format.
-     * WARNING: If the data is not compressed, it may be corrupted by this method!
-     * Compression detection currently only works in the GZIP format, so it is recommended to use the GZIP format.
-     * @param format The {@link wrath.util.Compression.CompressionType} to use on the data.
-     */
-    public void decompress(Compression.CompressionType format)
-    {
-        data = Compression.decompressData(data, format);
-    }
-    
-    /**
      * Converts the Packet's byte data to a singular generic Object.
      * @return Returns an {@link java.lang.Object} represented by the Packet's data.
      */
@@ -133,15 +91,17 @@ public class Packet
             Object r = conv.readObject();
             conv.close();
             this.dataAsObj = r;
-            return r;
+            if(r != null) return r;
         }
         catch(ClassNotFoundException e)
         {
             System.err.println("Could not read packet data as an Object, Unknown or corrupted data!");
+            this.dataAsObj = null;
         }
         catch(IOException e)
         {
             System.err.println("Could not read packet data as an Object, I/O ERROR!");
+            this.dataAsObj = null;
         }
         
         return null;
@@ -184,14 +144,5 @@ public class Packet
     public byte[] getRawData()
     {
         return data;
-    }
-    
-    /**
-     * Uses {@link wrath.util.Compression#isGZIPCompressed(byte[]) } to determine if the data in this Packet is compressed in the GZIP format.
-     * @return If compressed in the GZIP format, returns true. Otherwise false.
-     */
-    public boolean isGZIPCompressed()
-    {
-        return Compression.isGZIPCompressed(data);
     }
 }

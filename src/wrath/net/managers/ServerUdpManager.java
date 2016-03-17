@@ -15,8 +15,6 @@ import wrath.net.ConnectionState;
 import wrath.net.Packet;
 import wrath.net.Server;
 import wrath.net.ServerClient;
-import wrath.net.SessionFlag;
-import wrath.util.Compression;
 
 /**
  * Class to manage Server Connections using UDP.
@@ -34,15 +32,15 @@ public class ServerUdpManager extends ServerManager
     public ServerUdpManager(Server server)
     {
         super(server);
-        state = ConnectionState.SOCKET_NOT_BOUND;
         this.recvThread = new Thread(() ->
         {
             final byte[] buf = new byte[Server.getServerConfig().getInt("UdpClientRecvBufferSize", 512)];
+            final DatagramPacket packet = new DatagramPacket(buf, buf.length);
+            byte[] rbuf;
             while(svr.isBound() && !recvFlag)
             {
                 try
                 {
-                    DatagramPacket packet = new DatagramPacket(buf, buf.length);
                     svr.receive(packet);
                     String ident = packet.getAddress().toString() + ":" + packet.getPort();
                     if(!idenToClient.containsKey(ident))
@@ -53,7 +51,12 @@ public class ServerUdpManager extends ServerManager
                         idenToClient.put(ident, newClient);
                         onClientConnect(newClient);
                     }
-                    else onReceive(idenToClient.get(ident), new Packet(packet.getData()));
+                    else
+                    {
+                        rbuf = new byte[packet.getLength()];
+                        System.arraycopy(packet.getData(), 0, rbuf, 0, packet.getLength());
+                        onReceive(idenToClient.get(ident), new Packet(rbuf));
+                    }
                 }
                 catch(IOException ex)
                 {
@@ -68,16 +71,14 @@ public class ServerUdpManager extends ServerManager
     }
 
     @Override
-    public synchronized  void bindSocket(String ip, int port)
+    protected synchronized void closeSocket()
     {
-        if(isBound()) return;
-        
-        if(ip == null) ip = "*";
-        this.ip = ip;
-        this.port = port;
-        
-        recvFlag = false;
-        state = ConnectionState.BINDING_PORT;
+        svr.close();
+    }
+    
+    @Override
+    protected synchronized void createSocket(String ip, int port)
+    {
         try
         {
             if("*".equals(ip)) svr = new DatagramSocket(port);
@@ -94,34 +95,6 @@ public class ServerUdpManager extends ServerManager
             System.err.println("] Could not bind port to [" + ip + ":" + port + "]! Unkown binding IP '" + ip + "'!");
             state = ConnectionState.SOCKET_NOT_BOUND_ERROR;
         }
-        
-        if(!isBound())
-        {
-            System.err.println("] Could not bind ServerSocket to [" + ip + ":" + port + "]! UNKNOWN Error!");
-            state = ConnectionState.SOCKET_NOT_BOUND_ERROR;
-        }
-        else state = ConnectionState.LISTENING;
-        
-        recvThread.start();
-        execThread.start();
-    }
-
-    @Override
-    public synchronized void disconnectClient(ServerClient client, boolean calledFirst)
-    {
-        if(!clients.contains(client)) return;
-        if(calledFirst)
-        {
-            System.out.println("] Disconnecting Client " + client.getClientIdentifier() + ".");
-            send(client, Packet.TERMINATION_CALL);
-        }
-        else System.out.println("] Client " + client.getClientIdentifier() + " Disconnecting.");
-        clients.remove(client);
-        idenToClient.remove(client.getAddress().getHostAddress() + ":" + client.getPort());
-        
-        onClientDisconnect(client);
-        
-        System.out.println("] Client " + client.getClientIdentifier() + " Disconnected. ConnectionTime: " + ((double)(System.nanoTime() - client.getJoinTime())/1000000000) + "s");
     }
     
     /**
@@ -141,46 +114,21 @@ public class ServerUdpManager extends ServerManager
     }
 
     @Override
-    public synchronized void send(ServerClient client, byte[] data)
+    protected synchronized void pushData(ServerClient client, byte[] data)
     {
-        if(clients.contains(client))
+        try
         {
-            try
-            {
-                // Compression
-                if(server.getSessionFlags().contains(SessionFlag.GZIP_COMPRESSION)) data = Compression.compressData(data, Compression.CompressionType.GZIP);
-                
-                // Encryption
-                //      TODO: Encryption
-                
-                // Send data
-                svr.send(new DatagramPacket(data, data.length, client.getAddress(), client.getPort()));
-            }
-            catch(IOException ex)
-            {
-                System.err.println("] Could not send data to " + client.getClientIdentifier() + "! DataSize: " + data.length + "B");
-            }
+            svr.send(new DatagramPacket(data, data.length, client.getAddress(), client.getPort()));
+        } 
+        catch(IOException ex)
+        {
+            System.err.println("] Could not send data to " + client.getClientIdentifier() + "! DataSize: " + data.length + "B");
         }
-        else System.out.println("] WARNING: Attempted to send data to unknown client!");
     }
     
     @Override
-    public synchronized void unbindSocket()
+    protected synchronized void removeClient(ServerClient client)
     {
-        if(!isBound()) return;
-        System.out.println("] Closing ServerSocket.");
-        
-        ServerClient[] clis = new ServerClient[clients.size()];
-        clients.toArray(clis);
-        for(ServerClient c : clis)
-            if(c.isConnected()) c.disconnectClient();
-        clients.clear();
-        
-        recvFlag = true;
-        
-        svr.close();
-        
-        state = ConnectionState.SOCKET_CLOSED;
-        System.out.println("] ServerSocket Closed.");
+        idenToClient.remove(client.getAddress().getHostAddress() + ":" + client.getPort());
     }
 }

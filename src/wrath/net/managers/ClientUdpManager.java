@@ -10,10 +10,7 @@ import java.net.DatagramSocket;
 import java.net.InetSocketAddress;
 import java.net.SocketException;
 import wrath.net.Client;
-import wrath.net.ConnectionState;
 import wrath.net.Packet;
-import wrath.net.SessionFlag;
-import wrath.util.Compression;
 
 /**
  * Class to manage Client Connections using UDP.
@@ -30,7 +27,6 @@ public class ClientUdpManager extends ClientManager
     public ClientUdpManager(Client client)
     {
         super(client);
-        state = ConnectionState.DISCONNECTED_IDLE;
     }
     
     @Override
@@ -58,12 +54,15 @@ public class ClientUdpManager extends ClientManager
         {
             final byte[] buf = new byte[Client.getClientConfig().getInt("UdpRecvArraySize", 512)];
             final DatagramPacket packet = new DatagramPacket(buf, buf.length);
+            byte[] rbuf;
             while(!recvFlag && isConnected())
             {
                 try
                 {
                     sock.receive(packet);
-                    onReceive(client, new Packet(packet.getData()));
+                    rbuf = new byte[packet.getLength()];
+                    System.arraycopy(packet.getData(), 0, rbuf, 0, packet.getLength());
+                    onReceive(client, new Packet(rbuf));
                 }
                 catch(IOException ex){}
             }
@@ -71,27 +70,14 @@ public class ClientUdpManager extends ClientManager
         
         // Connect
         sock.connect(addr);
+        sock.send(new DatagramPacket(new byte[]{0}, 1));
     }
     
     @Override
-    public synchronized void disconnect(boolean calledFirst)
+    protected synchronized void closeSocket()
     {
-        // Check if still connected
-        if(!isConnected()) return;
-        // Signal other threads to stop
-        recvFlag = true;
-        // Check for the disconnect signal if Server is dropping this client. Otherwise send disconnect signal to Server.
-        if(!calledFirst) System.out.println("] Received disconnect signal from host.");
-        else send(new Packet(Packet.TERMINATION_CALL));
-        System.out.println("] Disconnecting from [" + ip + ":" + port + "]!");
-        
-        // Close objects
         sock.disconnect();
         sock.close();
-        
-        // Set State
-        state = ConnectionState.DISCONNECTED_SESSION_CLOSED;
-        System.out.println("] Disconnected.");
     }
     
     /**
@@ -110,23 +96,15 @@ public class ClientUdpManager extends ClientManager
     }
     
     @Override
-    public synchronized void send(byte[] data)
+    protected synchronized void pushData(byte[] data)
     {
-        if(isConnected())
-            try
-            {
-                // Compression
-                if(client.getSessionFlags().contains(SessionFlag.GZIP_COMPRESSION)) data = Compression.compressData(data);
-                
-                // Encryption
-                //      TODO: Encryption
-                
-                // Send data
-                sock.send(new DatagramPacket(data, data.length));
-            }
-            catch(IOException ex)
-            {
-                System.err.println("] Could not send data to [" + sock.getInetAddress().getHostAddress() + ":" + sock.getPort() + "]! I/O Error!");
-            }
+        try
+        {
+            sock.send(new DatagramPacket(data, data.length));
+        }
+        catch(IOException ex)
+        {
+            System.err.println("] Could not send data to [" + sock.getInetAddress().getHostAddress() + ":" + sock.getPort() + "]! I/O Error!");
+        }
     }
 }

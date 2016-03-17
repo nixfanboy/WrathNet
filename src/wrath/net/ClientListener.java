@@ -16,4 +16,16 @@ public interface ClientListener
      * @param packet The {@link wrath.net.Packet} containing the data.
      */
     public void onReceive(Client client, Packet packet);
+    
+    /**
+     * Method called when a Client connects to a server.
+     * @param client The {@link wrath.net.Client} that connected to the server.
+     */
+    public void onConnect(Client client);
+    
+    /**
+     * Method called when a Client disconnects from a server.
+     * @param client The {@link wrath.net.Client} that disconnected from the server.
+     */
+    public void onDisconnect(Client client);
 }

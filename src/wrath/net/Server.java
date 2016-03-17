@@ -10,6 +10,7 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashSet;
 import wrath.net.managers.ServerManager;
+import wrath.net.managers.ServerRudpManager;
 import wrath.net.managers.ServerTcpManager;
 import wrath.net.managers.ServerUdpManager;
 import wrath.util.Config;
@@ -44,7 +45,7 @@ public class Server
      * @param listener The {@link wrath.net.ServerListener} to report received data to.
      * @param flags List of {@link wrath.net.SessionFlag}s to change the way the connection is established.
      */
-    public Server(Protocol protocol, ServerListener listener, SessionFlag[] flags)
+    public Server(Protocol protocol, ServerListener listener, SessionFlag...flags)
     {
         this(protocol, listener, Arrays.asList(flags));
     }
@@ -62,7 +63,8 @@ public class Server
         this.flags.addAll(flags);
         
         if(proto == Protocol.TCP) man = new ServerTcpManager(this);
-        else man = new ServerUdpManager(this);
+        else if(proto == Protocol.UDP) man = new ServerUdpManager(this);
+        else man = new ServerRudpManager(this);
     }
     
     /**
@@ -87,6 +89,15 @@ public class Server
     }
     
     /**
+     * If data encryption was enabled, it is now disabled.
+     * WARNING: If a Client has encryption enabled then this Server will not be able to send/receive proper data from that Client.
+     */
+    public void disableDataEncryption()
+    {
+        man.disableDataEncryption();
+    }
+    
+    /**
      * Disconnects a client from the Server.
      * @see wrath.net.managers.ServerManager#disconnectClient(wrath.net.ServerClient) 
      * @param client The {@link wrath.net.ServerClient} to disconnect from the server.
@@ -94,6 +105,17 @@ public class Server
     public void disconnectClient(ServerClient client)
     {
         man.disconnectClient(client);
+    }
+    
+    /**
+     * Enables all data going through this Server->Client connection to be encrypted/decrypted with the specified phrase/key.
+     * @param passphrase The passphrase or key that must be at least 128-bit. No length limit below theoretical String length limit.
+     * WARNING: The Client and Server must both have encryption enabled with the same passphrase/key.
+     * WARNING: Enabling this process will slow the connection noticeably.
+     */
+    public void enableDataEncryption(String passphrase)
+    {
+        man.enableDataEncryption(passphrase);
     }
     
     /**

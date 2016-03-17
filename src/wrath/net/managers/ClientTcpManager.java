@@ -11,8 +11,6 @@ import java.net.SocketException;
 import wrath.net.Client;
 import wrath.net.ConnectionState;
 import wrath.net.Packet;
-import wrath.net.SessionFlag;
-import wrath.util.Compression;
 
 /**
  * Class to manage Client Connections using TCP.
@@ -29,7 +27,6 @@ public class ClientTcpManager extends ClientManager
     public ClientTcpManager(Client client)
     {
         super(client);
-        state = ConnectionState.DISCONNECTED_IDLE;
     }
     
     @Override
@@ -84,18 +81,8 @@ public class ClientTcpManager extends ClientManager
     }
     
     @Override
-    public synchronized void disconnect(boolean calledFirst)
+    protected synchronized void closeSocket()
     {
-        // Check if still connected
-        if(!isConnected()) return;
-        // Signal other threads to stop
-        recvFlag = true;
-        // Check for the disconnect signal if Server is dropping this client. Otherwise send disconnect signal to Server.
-        if(!calledFirst) System.out.println("] Received disconnect signal from host.");
-        else send(new Packet(Packet.TERMINATION_CALL));
-        System.out.println("] Disconnecting from [" + ip + ":" + port + "]!");
-        
-        // Close objects
         try
         {
             sock.close();
@@ -106,10 +93,6 @@ public class ClientTcpManager extends ClientManager
             System.err.println("] I/O Error occured while closing socket from [" + ip + ":" + port + "]!");
             return;
         }
-        
-        // Set State
-        state = ConnectionState.DISCONNECTED_SESSION_CLOSED;
-        System.out.println("] Disconnected.");
     }
     
     /**
@@ -128,24 +111,16 @@ public class ClientTcpManager extends ClientManager
     }
     
     @Override
-    public synchronized void send(byte[] data)
+    protected synchronized void pushData(byte[] data)
     {
-        if(client.isConnected()) 
-            try 
-            {
-                // Compression
-                if(client.getSessionFlags().contains(SessionFlag.GZIP_COMPRESSION)) data = Compression.compressData(data);
-                
-                // Encryption
-                //      TODO: Encryption
-                
-                // Send data
-                sock.getOutputStream().write(data);
-                sock.getOutputStream().flush();
-            }
-            catch(IOException ex) 
-            {
-                System.err.println("] Could not send data to [" + ip + ":" + port + "]! DataSize: " + data.length + "B");
-            }
+        try 
+        {
+            sock.getOutputStream().write(data);
+            sock.getOutputStream().flush();
+        }
+        catch (IOException ex) 
+        {
+            System.err.println("] Could not send data to [" + ip + ":" + port + "]! DataSize: " + data.length + "B");
+        }
     }
 }

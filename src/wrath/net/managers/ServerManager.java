@@ -14,6 +14,7 @@ import wrath.net.Server;
 import wrath.net.ServerClient;
 import wrath.net.SessionFlag;
 import wrath.util.Compression;
+import wrath.util.Encryption;
 
 /**
  * Abstract class that allows for polymorphism based on the protocol used in a connection.
@@ -24,6 +25,7 @@ public abstract class ServerManager
     protected Thread clientRecvThread;
     protected final HashSet<ServerClient> clients = new HashSet<>();
     protected String ip = null;
+    private String encryptKey = "";
     protected int port = 0;
     protected volatile boolean recvFlag = false;
     protected Thread recvThread;
@@ -62,17 +64,23 @@ public abstract class ServerManager
                 {
                     Packet p = event.packet;
                     // Decrypt
-                    //     TODO: Decryption
+                    if(!encryptKey.equals("")) p = new Packet(Encryption.decryptData(p.getRawData(), encryptKey));
                     
                     // Decompress
-                    if(server.getSessionFlags().contains(SessionFlag.GZIP_COMPRESSION))
-                        p.compress(Compression.CompressionType.GZIP);
-                    else if(Server.getServerConfig().getBoolean("CheckForGZIPCompression", false) && Compression.isGZIPCompressed(p.getRawData()))
-                        p.decompress(Compression.CompressionType.GZIP);
+                    if(server.getSessionFlags().contains(SessionFlag.GZIP_COMPRESSION) || (Server.getServerConfig().getBoolean("CheckForGZIPCompression", false) && Compression.isGZIPCompressed(p.getRawData())))
+                        p = new Packet(Compression.decompressData(p.getRawData(), Compression.CompressionType.GZIP));
                     
                     // Check if TERMINATION_CALL packet. Pushes event to Listener if not.
-                    if(p.getDataAsObject().equals(Packet.TERMINATION_CALL)) disconnectClient(event.client, false);
-                    else event.client.getServer().getServerListener().onReceive(event.client, p);
+                    try
+                    {
+                        if(new String(p.getRawData()).equals(Packet.TERMINATION_CALL)) disconnectClient(event.client, false);
+                        else
+                        {
+                            if(p == null) p = event.packet;
+                            event.client.getServer().getServerListener().onReceive(event.client, p);
+                        }
+                    }
+                    catch(NullPointerException e){}
                 }
             }
         }
@@ -92,7 +100,34 @@ public abstract class ServerManager
      * @param ip The IP address to listen on.
      * @param port The port for the server to listen to.
      */
-    public abstract void bindSocket(String ip, int port);
+    public void bindSocket(String ip, int port)
+    {
+        // Check if Bound
+        if(isBound()) return;
+        
+        // Set IP and Port
+        if(ip == null) ip = "*";
+        this.ip = ip;
+        this.port = port;
+        
+        // Reset Flag
+        recvFlag = false;
+        
+        // Set State
+        state = ConnectionState.BINDING_PORT;
+        
+        createSocket(ip, port);
+        
+        if(!isBound())
+        {
+            System.err.println("] Could not bind ServerSocket to [" + ip + ":" + port + "]! UNKNOWN Error!");
+            state = ConnectionState.SOCKET_NOT_BOUND_ERROR;
+        }
+        else state = ConnectionState.LISTENING;
+        
+        recvThread.start();
+        execThread.start();
+    }
     
     /**
      * Binds the server socket using the specified parameters.
@@ -101,6 +136,27 @@ public abstract class ServerManager
     public void bindSocket(int port)
     {
         bindSocket(null, port);
+    }
+    
+    /**
+     * Closes the implementation layer objects involved with the socket.
+     */
+    protected abstract void closeSocket();
+    
+    /**
+     * Creates the implementation layer socket object.
+     * @param ip The ip to bind to. Binds to '*' if NULL.
+     * @param port The port to bind to.
+     */
+    protected abstract void createSocket(String ip, int port);
+    
+    /**
+     * If data encryption was enabled, it is now disabled.
+     * WARNING: If a Client has encryption enabled then this Server will not be able to send/receive proper data from that Client.
+     */
+    public void disableDataEncryption()
+    {
+        encryptKey = "";
     }
     
     /**
@@ -117,7 +173,32 @@ public abstract class ServerManager
      * @param client The {@link wrath.net.ServerClient} to disconnect from the server.
      * @param calledFirst If true, then the Server is disconnecting from the Client. If false, the Client is disconnecting from the Server.
      */
-    public abstract void disconnectClient(ServerClient client, boolean calledFirst);
+    public void disconnectClient(ServerClient client, boolean calledFirst)
+    {
+        if(!clients.contains(client)) return;
+        if(calledFirst)
+        {
+            System.out.println("] Disconnecting Client " + client.getClientIdentifier() + ".");
+            client.send(Packet.TERMINATION_CALL.getBytes());
+        }
+        else System.out.println("] Client " + client.getClientIdentifier() + " Disconnecting.");
+        clients.remove(client);
+        removeClient(client);
+        
+        onClientDisconnect(client);
+        System.out.println("] Client " + client.getClientIdentifier() + " Disconnected. ConnectionTime: " + ((double)(System.nanoTime() - client.getJoinTime())/1000000000) + "s");
+    }
+    
+    /**
+     * Enables all data going through this Server->Client connection to be encrypted/decrypted with the specified phrase/key.
+     * @param passphrase The passphrase or key that must be at least 128-bit. No length limit below theoretical String length limit.
+     * WARNING: The Client and Server must both have encryption enabled with the same passphrase/key.
+     * WARNING: Enabling this process will slow the connection noticeably.
+     */
+    public void enableDataEncryption(String passphrase)
+    {
+        encryptKey = passphrase;
+    }
     
     /**
      * Gets the list of {@link wrath.net.ServerClient}s connected to this Server.
@@ -205,6 +286,41 @@ public abstract class ServerManager
     }
     
     /**
+                svr.send(new DatagramPacket(data, data.length, client.getAddress(), client.getPort()));
+     * Pushes the data through the socket through the implementation class.
+     * @param client The {@link wrath.net.ServerClient} to send data to.
+     * @param data The final data to be sent, after compression and encryption.
+     */
+    protected abstract void pushData(ServerClient client, byte[] data);
+    
+    /**
+     * Removes the {@link wrath.net.ServerClient} from any implementation-layer registries.
+     * @param client The {@link wrath.net.ServerClient} that is disconnecting.
+     */
+    protected abstract void removeClient(ServerClient client);
+    
+    /**
+     * Sends data to the specified {@link wrath.net.ServerClient}, if it is connected.
+     * @param client The {@link wrath.net.ServerClient} to send data to.
+     * @param data The data to send to the Client.
+     */
+    public void send(ServerClient client, byte[] data)
+    {
+        if(clients.contains(client))
+        {
+            // Compression
+            if(server.getSessionFlags().contains(SessionFlag.GZIP_COMPRESSION)) data = Compression.compressData(data, Compression.CompressionType.GZIP);
+                
+            // Encryption
+            if(!encryptKey.equals("")) data = Encryption.encryptData(data, encryptKey);
+                
+            // Push data
+            pushData(client, data);
+        }
+        else System.out.println("] WARNING: Attempted to send data to unknown client!");
+    }
+    
+    /**
      * Sends data to the specified {@link wrath.net.ServerClient}, if it is connected.
      * @param client The {@link wrath.net.ServerClient} to send data to.
      * @param object The object to send to the Client.
@@ -215,7 +331,7 @@ public abstract class ServerManager
     }
     
     /**
-     * Sends data to the specified {@link wrath.net.ServerClient}, if it is connected.
+     * Sends data to the Client, if it is connected.
      * @param client The {@link wrath.net.ServerClient} to send data to.
      * @param packet The {@link wrath.net.Packet} containing the data to send to the Client.
      */
@@ -225,17 +341,27 @@ public abstract class ServerManager
     }
     
     /**
-     * Sends data to the specified {@link wrath.net.ServerClient}, if it is connected.
-     * @param client The {@link wrath.net.ServerClient} to send data to.
-     * @param data The data to send to the Client.
-     */
-    public abstract void send(ServerClient client, byte[] data);
-    
-    /**
      * Unbinds the Server socket from the previously specified port.
      * Also cleans up all resources associated with the Server connection.
      */
-    public abstract void unbindSocket();
+    public void unbindSocket()
+    {
+        if(!isBound()) return;
+        System.out.println("] Closing ServerSocket.");
+        
+        ServerClient[] clis = new ServerClient[clients.size()];
+        clients.toArray(clis);
+        for(ServerClient c : clis)
+            if(c.isConnected()) c.disconnectClient();
+        clients.clear();
+        
+        recvFlag = true;
+        
+        closeSocket();
+        
+        state = ConnectionState.SOCKET_CLOSED;
+        System.out.println("] ServerSocket Closed.");
+    }
 }
 
 class ServerReceivedEvent
