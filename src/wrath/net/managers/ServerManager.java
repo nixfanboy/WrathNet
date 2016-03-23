@@ -8,6 +8,7 @@ import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
+import javax.crypto.spec.SecretKeySpec;
 import wrath.net.ConnectionState;
 import wrath.net.Packet;
 import wrath.net.Server;
@@ -25,7 +26,7 @@ public abstract class ServerManager
     protected Thread clientRecvThread;
     protected final HashSet<ServerClient> clients = new HashSet<>();
     protected String ip = null;
-    private String encryptKey = "";
+    private SecretKeySpec encryptKey = null;
     protected int port = 0;
     protected volatile boolean recvFlag = false;
     protected Thread recvThread;
@@ -64,12 +65,10 @@ public abstract class ServerManager
                 {
                     Packet p = event.packet;
                     // Decrypt
-                    if(!encryptKey.equals("")) p = new Packet(Encryption.decryptData(p.getRawData(), encryptKey));
-                    
+                    if(encryptKey != null) p = new Packet(Encryption.decryptData(p.getRawData(), encryptKey));
                     // Decompress
                     if(server.getSessionFlags().contains(SessionFlag.GZIP_COMPRESSION) || (Server.getServerConfig().getBoolean("CheckForGZIPCompression", false) && Compression.isGZIPCompressed(p.getRawData())))
                         p = new Packet(Compression.decompressData(p.getRawData(), Compression.CompressionType.GZIP));
-                    
                     // Check if TERMINATION_CALL packet. Pushes event to Listener if not.
                     try
                     {
@@ -156,7 +155,7 @@ public abstract class ServerManager
      */
     public void disableDataEncryption()
     {
-        encryptKey = "";
+        encryptKey = null;
     }
     
     /**
@@ -197,7 +196,7 @@ public abstract class ServerManager
      */
     public void enableDataEncryption(String passphrase)
     {
-        encryptKey = passphrase;
+        encryptKey = Encryption.generateKey(passphrase, "salt");
     }
     
     /**
@@ -286,7 +285,6 @@ public abstract class ServerManager
     }
     
     /**
-                svr.send(new DatagramPacket(data, data.length, client.getAddress(), client.getPort()));
      * Pushes the data through the socket through the implementation class.
      * @param client The {@link wrath.net.ServerClient} to send data to.
      * @param data The final data to be sent, after compression and encryption.
@@ -310,10 +308,8 @@ public abstract class ServerManager
         {
             // Compression
             if(server.getSessionFlags().contains(SessionFlag.GZIP_COMPRESSION)) data = Compression.compressData(data, Compression.CompressionType.GZIP);
-                
             // Encryption
-            if(!encryptKey.equals("")) data = Encryption.encryptData(data, encryptKey);
-                
+            if(encryptKey != null) data = Encryption.encryptData(data, encryptKey);
             // Push data
             pushData(client, data);
         }

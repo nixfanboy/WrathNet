@@ -10,6 +10,7 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
+import javax.crypto.spec.SecretKeySpec;
 import wrath.net.Client;
 import wrath.net.ConnectionState;
 import wrath.net.Packet;
@@ -26,7 +27,7 @@ public abstract class ClientManager
     protected Client client;
     protected String ip = "0.0.0.0";
     protected int port = 0;
-    private String encryptKey = "";
+    private SecretKeySpec encryptKey = null;
     protected volatile boolean recvFlag = false;
     private final ArrayList<ReceivedEvent> execList = new ArrayList<>();
     protected Thread execThread = new Thread(() ->
@@ -41,7 +42,7 @@ public abstract class ClientManager
                     {
                         Packet p = event.packet;
                         // Decrypt
-                        if(!encryptKey.equals("")) p = new Packet(Encryption.decryptData(p.getRawData(), encryptKey));
+                        if(encryptKey != null) p = new Packet(Encryption.decryptData(p.getRawData(), encryptKey));
                         
                         // Decompress
                         if(client.getSessionFlags().contains(SessionFlag.GZIP_COMPRESSION) || (Client.getClientConfig().getBoolean("CheckForGZIPCompression", false) && Compression.isGZIPCompressed(p.getRawData())))  
@@ -141,7 +142,7 @@ public abstract class ClientManager
      */
     public void disableDataEncryption()
     {
-        encryptKey = "";
+        encryptKey = null;
     }
     
     /**
@@ -182,7 +183,7 @@ public abstract class ClientManager
      */
     public void enableDataEncryption(String passphrase)
     {
-        encryptKey = passphrase;
+        encryptKey = Encryption.generateKey(passphrase, "salt");
     }
     
     /**
@@ -247,8 +248,8 @@ public abstract class ClientManager
             // Compression
             if(client.getSessionFlags().contains(SessionFlag.GZIP_COMPRESSION)) data = Compression.compressData(data, Compression.CompressionType.GZIP);
             // Encryption
-            if(!encryptKey.equals("")) data = Encryption.encryptData(data, encryptKey);
-            
+            if(encryptKey != null) data = Encryption.encryptData(data, encryptKey);
+            // Push Data
             pushData(data);
         }
     }

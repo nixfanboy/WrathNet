@@ -18,7 +18,7 @@ import java.io.Serializable;
  */
 public class Packet
 {
-    public static final String TERMINATION_CALL = (char) 0 + "session" + (char) 0 + "end" + (char) 0 + "disconnect" + (char) 0 + "req";
+    public static final String TERMINATION_CALL = (char) 0 + "bye" + (char) 0;
     
     private byte[] data = new byte[0];
     private transient Object dataAsObj = null;
@@ -85,13 +85,21 @@ public class Packet
     public Object getDataAsObject()
     {
         if(dataAsObj != null) return dataAsObj;
+        if(dataAsArr != null)
+        {
+            if(dataAsArr.length == 1) dataAsObj = dataAsArr[0];
+            else dataAsObj = (Object) dataAsArr;
+            return dataAsObj;
+        }
+        
         try
         {
             ObjectInputStream conv = new ObjectInputStream(new ByteArrayInputStream(data));
             Object r = conv.readObject();
             conv.close();
             this.dataAsObj = r;
-            if(r != null) return r;
+            this.dataAsArr = new Object[]{r};
+            return r;
         }
         catch(ClassNotFoundException e)
         {
@@ -114,6 +122,7 @@ public class Packet
     public Object[] getDataAsObjectArray()
     {
         if(dataAsArr != null) return dataAsArr;
+        
         try
         {
             ObjectInputStream conv = new ObjectInputStream(new ByteArrayInputStream(data));
@@ -123,6 +132,7 @@ public class Packet
             if(r instanceof Object[]) ra = (Object[]) r;
             else ra = new Object[]{r};
             this.dataAsArr = ra;
+            this.dataAsObj = r;
             return ra;
         }
         catch(ClassNotFoundException e)
