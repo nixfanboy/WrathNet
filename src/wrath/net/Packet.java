@@ -10,6 +10,7 @@ import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.Serializable;
+import java.nio.charset.Charset;
 
 /**
  * Class used to transport and convert raw byte data to other kinds of data.
@@ -18,7 +19,7 @@ import java.io.Serializable;
  */
 public class Packet
 {
-    public static final String TERMINATION_CALL = (char) 0 + "bye" + (char) 0;
+    public static final byte[] TERMINATION_CALL = ((char) 0 + "bye" + (char) 0).getBytes(Charset.forName("UTF-8"));
     
     private byte[] data = new byte[0];
     private transient Object dataAsObj = null;

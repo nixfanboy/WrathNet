@@ -6,6 +6,7 @@ package wrath.net.managers;
 
 import java.io.Serializable;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashSet;
 import javax.crypto.spec.SecretKeySpec;
@@ -72,7 +73,7 @@ public abstract class ServerManager
                     // Check if TERMINATION_CALL packet. Pushes event to Listener if not.
                     try
                     {
-                        if(new String(p.getRawData()).equals(Packet.TERMINATION_CALL)) disconnectClient(event.client, false);
+                        if(Arrays.equals(p.getRawData(), Packet.TERMINATION_CALL)) disconnectClient(event.client, false);
                         else
                         {
                             if(p == null) p = event.packet;
@@ -178,7 +179,7 @@ public abstract class ServerManager
         if(calledFirst)
         {
             System.out.println("] Disconnecting Client " + client.getClientIdentifier() + ".");
-            client.send(Packet.TERMINATION_CALL.getBytes());
+            client.send(Packet.TERMINATION_CALL);
         }
         else System.out.println("] Client " + client.getClientIdentifier() + " Disconnecting.");
         clients.remove(client);

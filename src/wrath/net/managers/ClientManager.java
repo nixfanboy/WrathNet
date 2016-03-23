@@ -10,6 +10,7 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import javax.crypto.spec.SecretKeySpec;
 import wrath.net.Client;
 import wrath.net.ConnectionState;
@@ -51,7 +52,7 @@ public abstract class ClientManager
                         // Check if TERMINATION_CALL packet. Pushes event to Listener if not.
                         try
                         {
-                            if(new String(p.getRawData()).equals(Packet.TERMINATION_CALL)) disconnect(false);
+                            if(Arrays.equals(p.getRawData(), Packet.TERMINATION_CALL)) disconnect(false);
                             else
                             {
                                 if(p == null) p = event.packet;
@@ -165,7 +166,7 @@ public abstract class ClientManager
         recvFlag = true;
         // Check for the disconnect signal if Server is dropping this client. Otherwise send disconnect signal to Server.
         if(!calledFirst) System.out.println("] Received disconnect signal from host.");
-        else send(Packet.TERMINATION_CALL.getBytes());
+        else send(Packet.TERMINATION_CALL);
         System.out.println("] Disconnecting from [" + ip + ":" + port + "]!");
         
         closeSocket();
