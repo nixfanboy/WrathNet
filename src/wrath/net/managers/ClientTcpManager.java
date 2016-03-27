@@ -72,7 +72,7 @@ public class ClientTcpManager extends ClientManager
                     if(isConnected() && !recvFlag) System.err.println("] Could not read from input stream from [" + ip + ":" + port + "]!");
                     continue;
                 }
-                onReceive(client, new Packet(rbuf));
+                receive(client, new Packet(rbuf));
             }
         });
         
@@ -107,7 +107,7 @@ public class ClientTcpManager extends ClientManager
     @Override
     public boolean isConnected()
     {
-        return (sock != null && (sock.isConnected() && !sock.isClosed()));
+        return sock != null && sock.isConnected() && !sock.isClosed();
     }
     
     @Override

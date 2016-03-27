@@ -4,6 +4,7 @@
  */
 package wrath.net.managers;
 
+import java.io.IOException;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -14,7 +15,6 @@ import wrath.net.ConnectionState;
 import wrath.net.Packet;
 import wrath.net.Server;
 import wrath.net.ServerClient;
-import wrath.net.SessionFlag;
 import wrath.util.Compression;
 import wrath.util.Encryption;
 
@@ -27,6 +27,7 @@ public abstract class ServerManager
     protected Thread clientRecvThread;
     protected final HashSet<ServerClient> clients = new HashSet<>();
     protected String ip = null;
+    private Compression.CompressionType compressFormat = null;
     private SecretKeySpec encryptKey = null;
     protected int port = 0;
     protected volatile boolean recvFlag = false;
@@ -37,6 +38,10 @@ public abstract class ServerManager
     private final ArrayList<ServerClient> conList = new ArrayList<>();
     private final ArrayList<ServerClient> dconList = new ArrayList<>();
     private final ArrayList<ServerReceivedEvent> execList = new ArrayList<>();
+
+    /**
+     * Thread where all data is processed. This includes compression, encryption, and the onReceive(), onClientConnect(), and onClientDisconnect() methods.
+     */
     protected final Thread execThread = new Thread(() ->
     {
         while(!recvFlag)
@@ -65,20 +70,18 @@ public abstract class ServerManager
                 for(ServerReceivedEvent event : events)
                 {
                     Packet p = event.packet;
+                    
                     // Decrypt
                     if(encryptKey != null) p = new Packet(Encryption.decryptData(p.getRawData(), encryptKey));
+                    
                     // Decompress
-                    if(server.getSessionFlags().contains(SessionFlag.GZIP_COMPRESSION) || (Server.getServerConfig().getBoolean("CheckForGZIPCompression", false) && Compression.isGZIPCompressed(p.getRawData())))
-                        p = new Packet(Compression.decompressData(p.getRawData(), Compression.CompressionType.GZIP));
+                    if(compressFormat != null) p = new Packet(Compression.decompressData(p.getRawData(), compressFormat));
+                    
                     // Check if TERMINATION_CALL packet. Pushes event to Listener if not.
                     try
                     {
                         if(Arrays.equals(p.getRawData(), Packet.TERMINATION_CALL)) disconnectClient(event.client, false);
-                        else
-                        {
-                            if(p == null) p = event.packet;
-                            event.client.getServer().getServerListener().onReceive(event.client, p);
-                        }
+                        else event.client.getServer().getServerListener().onReceive(event.client, p);
                     }
                     catch(NullPointerException e){}
                 }
@@ -110,23 +113,33 @@ public abstract class ServerManager
         this.ip = ip;
         this.port = port;
         
-        // Reset Flag
-        recvFlag = false;
-        
         // Set State
         state = ConnectionState.BINDING_PORT;
+        System.out.println("] Binding ServerSocket to [" + ip + ":" + port + "]!");
         
-        createSocket(ip, port);
-        
-        if(!isBound())
+        try
+        {
+            // Create the Socket
+            createSocket(ip, port);
+            
+            // Reset Flag
+            recvFlag = false;
+            // Manage Threads
+            recvThread.setName("NetServerRecvThread");
+            execThread.setName("NetServerExecThread");
+            execThread.setDaemon(true);
+            execThread.start();
+            recvThread.start();
+            
+            // Set State
+            state = ConnectionState.LISTENING;
+            System.out.println("] ServerSocket Bound to [" + ip + ":" + port + "]!");
+        }
+        catch(IOException e)
         {
             System.err.println("] Could not bind ServerSocket to [" + ip + ":" + port + "]! UNKNOWN Error!");
             state = ConnectionState.SOCKET_NOT_BOUND_ERROR;
         }
-        else state = ConnectionState.LISTENING;
-        
-        recvThread.start();
-        execThread.start();
     }
     
     /**
@@ -147,11 +160,21 @@ public abstract class ServerManager
      * Creates the implementation layer socket object.
      * @param ip The ip to bind to. Binds to '*' if NULL.
      * @param port The port to bind to.
+     * @throws java.io.IOException
      */
-    protected abstract void createSocket(String ip, int port);
+    protected abstract void createSocket(String ip, int port) throws IOException;
     
     /**
-     * If data encryption was enabled, it is now disabled.
+     * If data compression was enabled, this will disable it.
+     * WARNING: If a Client has compression enabled then the Client will not be able to send/receive proper data from/to this Server.
+     */
+    public void disableDataCompression()
+    {
+        compressFormat = null;
+    }
+    
+    /**
+     * If data encryption was enabled, this will disable it.
      * WARNING: If a Client has encryption enabled then this Server will not be able to send/receive proper data from that Client.
      */
     public void disableDataEncryption()
@@ -187,6 +210,17 @@ public abstract class ServerManager
         
         onClientDisconnect(client);
         System.out.println("] Client " + client.getClientIdentifier() + " Disconnected. ConnectionTime: " + ((double)(System.nanoTime() - client.getJoinTime())/1000000000) + "s");
+    }
+    
+    /**
+     * Enables data being sent and received to be compressed and decompressed in specified format.
+     * WARNING: This should only be enabled when sending large amounts of data.
+     * WARNING: The Server and Client must both have compression enabled with the same format.
+     * @param format The format to compress the data with.
+     */
+    public void enableDataCompression(Compression.CompressionType format)
+    {
+        compressFormat = format;
     }
     
     /**
@@ -276,21 +310,21 @@ public abstract class ServerManager
     }
     
     /**
-     * Called when a packet is received and then placed into a queue that will later get executed on the execution thread.
-     * @param c The {@link wrath.net.ServerClient} being managed.
-     * @param p The {@link wrath.net.Packet} containing the received data.
-     */
-    protected void onReceive(ServerClient c, Packet p)
-    {
-        execList.add(new ServerReceivedEvent(c, p));
-    }
-    
-    /**
      * Pushes the data through the socket through the implementation class.
      * @param client The {@link wrath.net.ServerClient} to send data to.
      * @param data The final data to be sent, after compression and encryption.
      */
     protected abstract void pushData(ServerClient client, byte[] data);
+    
+    /**
+     * Called when a packet is received and then placed into a queue that will later get executed on the execution thread.
+     * @param c The {@link wrath.net.ServerClient} being managed.
+     * @param p The {@link wrath.net.Packet} containing the received data.
+     */
+    protected void receive(ServerClient c, Packet p)
+    {
+        execList.add(new ServerReceivedEvent(c, p));
+    }
     
     /**
      * Removes the {@link wrath.net.ServerClient} from any implementation-layer registries.
@@ -308,9 +342,11 @@ public abstract class ServerManager
         if(clients.contains(client))
         {
             // Compression
-            if(server.getSessionFlags().contains(SessionFlag.GZIP_COMPRESSION)) data = Compression.compressData(data, Compression.CompressionType.GZIP);
+            if(compressFormat != null) data = Compression.compressData(data, compressFormat);
+            
             // Encryption
             if(encryptKey != null) data = Encryption.encryptData(data, encryptKey);
+            
             // Push data
             pushData(client, data);
         }
@@ -359,16 +395,16 @@ public abstract class ServerManager
         state = ConnectionState.SOCKET_CLOSED;
         System.out.println("] ServerSocket Closed.");
     }
-}
-
-class ServerReceivedEvent
-{
-    public final ServerClient client;
-    public final Packet packet;
-
-    protected ServerReceivedEvent(ServerClient c, Packet p)
+    
+    private class ServerReceivedEvent
     {
-        this.client = c;
-        this.packet = p;
+        public final ServerClient client;
+        public final Packet packet;
+
+        private ServerReceivedEvent(ServerClient c, Packet p)
+        {
+            this.client = c;
+            this.packet = p;
+        }
     }
 }

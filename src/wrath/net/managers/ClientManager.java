@@ -15,7 +15,6 @@ import javax.crypto.spec.SecretKeySpec;
 import wrath.net.Client;
 import wrath.net.ConnectionState;
 import wrath.net.Packet;
-import wrath.net.SessionFlag;
 import wrath.util.Compression;
 import wrath.util.Encryption;
 
@@ -28,9 +27,14 @@ public abstract class ClientManager
     protected Client client;
     protected String ip = "0.0.0.0";
     protected int port = 0;
+    private Compression.CompressionType compressFormat = null;
     private SecretKeySpec encryptKey = null;
     protected volatile boolean recvFlag = false;
     private final ArrayList<ReceivedEvent> execList = new ArrayList<>();
+
+    /**
+     * Thread where all data is processed. This includes compression, encryption, and the onReceive() method.
+     */
     protected Thread execThread = new Thread(() ->
         {
             while(!recvFlag)
@@ -46,18 +50,13 @@ public abstract class ClientManager
                         if(encryptKey != null) p = new Packet(Encryption.decryptData(p.getRawData(), encryptKey));
                         
                         // Decompress
-                        if(client.getSessionFlags().contains(SessionFlag.GZIP_COMPRESSION) || (Client.getClientConfig().getBoolean("CheckForGZIPCompression", false) && Compression.isGZIPCompressed(p.getRawData())))  
-                            p = new Packet(Compression.decompressData(p.getRawData(), Compression.CompressionType.GZIP));
+                        if(compressFormat != null) p = new Packet(Compression.decompressData(p.getRawData(), compressFormat));
                         
                         // Check if TERMINATION_CALL packet. Pushes event to Listener if not.
                         try
                         {
                             if(Arrays.equals(p.getRawData(), Packet.TERMINATION_CALL)) disconnect(false);
-                            else
-                            {
-                                if(p == null) p = event.packet;
-                                event.client.getClientListener().onReceive(event.client, p);
-                            }
+                            else event.client.getClientListener().onReceive(event.client, p);
                         }
                         catch(NullPointerException e) {}
                     }
@@ -107,11 +106,11 @@ public abstract class ClientManager
             recvFlag = false;
             // Manage Threads
             recvThread.setName("NetClientRecvThread");
-            recvThread.setDaemon(true);
-            recvThread.start();
             execThread.setName("NetClientExecThread");
+            recvThread.setDaemon(true);
             execThread.setDaemon(true);
             execThread.start();
+            recvThread.start();
             
             // Set State
             state = ConnectionState.CONNECTED;
@@ -138,7 +137,16 @@ public abstract class ClientManager
     protected abstract void createNewSocket(InetSocketAddress address) throws IOException;
     
     /**
-     * If data encryption was enabled, it is now disabled.
+     * If data compression was enabled, this will disable it.
+     * WARNING: If the Server has compression enabled then this Client will not be able to send/receive proper data from the Server.
+     */
+    public void disableDataCompression()
+    {
+        compressFormat = null;
+    }
+    
+    /**
+     * If data encryption was enabled, this will disable it.
      * WARNING: If the Server has encryption enabled then this Client will not be able to send/receive proper data from the Server.
      */
     public void disableDataEncryption()
@@ -174,6 +182,17 @@ public abstract class ClientManager
         if(state == ConnectionState.CONNECTED) state = ConnectionState.DISCONNECTED_SESSION_CLOSED;
         client.getClientListener().onDisconnect(client);
         System.out.println("] Disconnected.");
+    }
+    
+    /**
+     * Enables data being sent and received to be compressed and decompressed in specified format.
+     * WARNING: This should only be enabled when sending large amounts of data.
+     * WARNING: The Server and Client must both have compression enabled with the same format.
+     * @param format The format to compress the data with.
+     */
+    public void enableDataCompression(Compression.CompressionType format)
+    {
+        compressFormat = format;
     }
     
     /**
@@ -223,20 +242,20 @@ public abstract class ClientManager
     public abstract boolean isConnected();
     
     /**
-     * Called when a packet is received and then placed into a queue that will later get executed on the execution thread.
-     * @param c The {@link wrath.net.Client} being managed.
-     * @param p The {@link wrath.net.Packet} containing the received data.
-     */
-    protected void onReceive(Client c, Packet p)
-    {
-        execList.add(new ReceivedEvent(c, p));
-    }
-    
-    /**
      * Sends the final data to the Server.
      * @param data The final data to send after compression and encryption.
      */
     protected abstract void pushData(byte[] data);
+    
+    /**
+     * Called when a packet is received and then placed into a queue that will later get executed on the execution thread.
+     * @param c The {@link wrath.net.Client} being managed.
+     * @param p The {@link wrath.net.Packet} containing the received data.
+     */
+    protected void receive(Client c, Packet p)
+    {
+        execList.add(new ReceivedEvent(c, p));
+    }
     
     /**
      * Sends data to the Server the Client is connected to, if it is connected.
@@ -247,7 +266,7 @@ public abstract class ClientManager
         if(client.isConnected())
         {
             // Compression
-            if(client.getSessionFlags().contains(SessionFlag.GZIP_COMPRESSION)) data = Compression.compressData(data, Compression.CompressionType.GZIP);
+            if(compressFormat != null) data = Compression.compressData(data, compressFormat);
             // Encryption
             if(encryptKey != null) data = Encryption.encryptData(data, encryptKey);
             // Push Data
@@ -272,16 +291,16 @@ public abstract class ClientManager
     {
         send(packet.getRawData());
     }
-}
-
-class ReceivedEvent
-{
-    public final Client client;
-    public final Packet packet;
-
-    protected ReceivedEvent(Client c, Packet p)
+    
+    private class ReceivedEvent
     {
-        this.client = c;
-        this.packet = p;
+        public final Client client;
+        public final Packet packet;
+
+        private ReceivedEvent(Client c, Packet p)
+        {
+            this.client = c;
+            this.packet = p;
+        }
     }
 }

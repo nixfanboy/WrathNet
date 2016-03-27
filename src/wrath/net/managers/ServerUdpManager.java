@@ -8,10 +8,9 @@ import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
+import java.net.InetSocketAddress;
 import java.net.SocketException;
-import java.net.UnknownHostException;
 import java.util.HashMap;
-import wrath.net.ConnectionState;
 import wrath.net.Packet;
 import wrath.net.Server;
 import wrath.net.ServerClient;
@@ -32,6 +31,36 @@ public class ServerUdpManager extends ServerManager
     public ServerUdpManager(Server server)
     {
         super(server);
+    }
+
+    @Override
+    protected synchronized void closeSocket()
+    {
+        svr.close();
+    }
+    
+    @Override
+    protected synchronized void createSocket(String ip, int port) throws IOException
+    {
+        // Define Object
+        if("*".equals(ip)) svr = new DatagramSocket(new InetSocketAddress(port));
+        else svr = new DatagramSocket(new InetSocketAddress(InetAddress.getByName(ip), port));
+        
+        // Set Object Properties
+        try
+        {
+            svr.setReceiveBufferSize(Server.getServerConfig().getInt("UdpRecvBufferSize", svr.getReceiveBufferSize()));
+            svr.setBroadcast(Server.getServerConfig().getBoolean("UdpSBroadcast", svr.getBroadcast()));
+            svr.setSendBufferSize(Server.getServerConfig().getInt("UdpSendBufferSize", svr.getSendBufferSize()));
+            svr.setReuseAddress(Server.getServerConfig().getBoolean("UdpReuseAddress", svr.getReuseAddress()));
+            svr.setTrafficClass(Server.getServerConfig().getInt("UdpTrafficClass", svr.getTrafficClass()));
+        }
+        catch(SocketException ex)
+        {
+            System.err.println("] Could not set UDP Socket properties! I/O Error!");
+        }
+        
+        // Define Receive Thread
         this.recvThread = new Thread(() ->
         {
             final byte[] buf = new byte[Server.getServerConfig().getInt("UdpClientRecvBufferSize", 512)];
@@ -55,7 +84,7 @@ public class ServerUdpManager extends ServerManager
                     {
                         rbuf = new byte[packet.getLength()];
                         System.arraycopy(packet.getData(), 0, rbuf, 0, packet.getLength());
-                        onReceive(idenToClient.get(ident), new Packet(rbuf));
+                        receive(idenToClient.get(ident), new Packet(rbuf));
                     }
                 }
                 catch(IOException ex)
@@ -64,37 +93,6 @@ public class ServerUdpManager extends ServerManager
                 }
             }
         });
-        
-        recvThread.setName("NetUdpServerRecv");
-        execThread.setName("NetUdpServerExec");
-        execThread.setDaemon(true);
-    }
-
-    @Override
-    protected synchronized void closeSocket()
-    {
-        svr.close();
-    }
-    
-    @Override
-    protected synchronized void createSocket(String ip, int port)
-    {
-        try
-        {
-            if("*".equals(ip)) svr = new DatagramSocket(port);
-            else svr = new DatagramSocket(port, InetAddress.getByName(ip));
-            System.out.println("] ServerSocket bound to [" + ip + ":" + port + "].");
-        }
-        catch(SocketException ex)
-        {
-            System.err.println("] Could not bind port to [" + ip + ":" + port + "]! Socket Error/Port '" + port + "' already bound!");
-            state = ConnectionState.SOCKET_NOT_BOUND_ERROR;
-        }
-        catch(UnknownHostException e)
-        {
-            System.err.println("] Could not bind port to [" + ip + ":" + port + "]! Unkown binding IP '" + ip + "'!");
-            state = ConnectionState.SOCKET_NOT_BOUND_ERROR;
-        }
     }
     
     /**
@@ -109,8 +107,7 @@ public class ServerUdpManager extends ServerManager
     @Override
     public boolean isBound()
     {
-        if(svr == null) return false;
-        return svr.isBound() && !svr.isClosed();
+        return svr != null && svr.isBound() && !svr.isClosed();
     }
 
     @Override

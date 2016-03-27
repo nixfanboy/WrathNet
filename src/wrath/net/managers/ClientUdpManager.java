@@ -32,11 +32,12 @@ public class ClientUdpManager extends ClientManager
     @Override
     protected synchronized void createNewSocket(InetSocketAddress addr) throws IOException
     {
+        // Define Object
+        this.sock = new DatagramSocket();
+        
+        // Set Object Properties
         try
         {
-            // Define Object
-            this.sock = new DatagramSocket();
-            // Set Object Properties
             sock.setSoTimeout(Client.getClientConfig().getInt("Timeout", 500));
             sock.setReceiveBufferSize(Client.getClientConfig().getInt("UdpRecvBufferSize", sock.getReceiveBufferSize()));
             sock.setBroadcast(Client.getClientConfig().getBoolean("UdpSBroadcast", sock.getBroadcast()));
@@ -46,7 +47,7 @@ public class ClientUdpManager extends ClientManager
         }
         catch(SocketException ex)
         {
-            System.err.println("] Could not bind UDP Socket! Socket Error!");
+            System.err.println("] Could not set UDP Socket properties! I/O Error!");
         }
         
         // Define Receive Thread
@@ -62,7 +63,7 @@ public class ClientUdpManager extends ClientManager
                     sock.receive(packet);
                     rbuf = new byte[packet.getLength()];
                     System.arraycopy(packet.getData(), 0, rbuf, 0, packet.getLength());
-                    onReceive(client, new Packet(rbuf));
+                    receive(client, new Packet(rbuf));
                 }
                 catch(IOException ex){}
             }
@@ -92,7 +93,7 @@ public class ClientUdpManager extends ClientManager
     @Override
     public boolean isConnected()
     {
-        return sock != null && sock.isConnected();
+        return sock != null && sock.isConnected() && !sock.isClosed();
     }
     
     @Override

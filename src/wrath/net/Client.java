@@ -6,13 +6,11 @@ package wrath.net;
 
 import java.io.File;
 import java.io.Serializable;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.HashSet;
 import wrath.net.managers.ClientManager;
 import wrath.net.managers.ClientRudpManager;
 import wrath.net.managers.ClientTcpManager;
 import wrath.net.managers.ClientUdpManager;
+import wrath.util.Compression;
 import wrath.util.Config;
 
 /**
@@ -24,7 +22,6 @@ public class Client
 {
     private static final Config clientCfg = new Config(new File("netclient.cfg"));
     
-    private final HashSet<SessionFlag> flags = new HashSet<>();
     private ClientListener listener;
     private final ClientManager man;
     private final Protocol proto;
@@ -36,31 +33,8 @@ public class Client
      */
     public Client(Protocol protocol, ClientListener listener)
     {
-        this(protocol, listener, new SessionFlag[0]);
-    }
-    
-    /**
-     * Constructor.
-     * @param protocol The {@link wrath.net.Protocol} to use in the connection. This cannot be changed.
-     * @param listener The {@link wrath.net.ClientListener} to report received data to.
-     * @param flags List of {@link wrath.net.SessionFlag}s to change the way the connection is established.
-     */
-    public Client(Protocol protocol, ClientListener listener, SessionFlag...flags)
-    {
-        this(protocol, listener, Arrays.asList(flags));
-    }
-    
-    /**
-     * Constructor.
-     * @param protocol The {@link wrath.net.Protocol} to use in the connection. This cannot be changed.
-     * @param listener The {@link wrath.net.ClientListener} to report received data to.
-     * @param flags List of {@link wrath.net.SessionFlag}s to change the way the connection is established.
-     */
-    public Client(Protocol protocol, ClientListener listener, Collection<SessionFlag> flags)
-    {
         this.proto = protocol;
         this.listener = listener;
-        this.flags.addAll(flags);
         
         if(proto == Protocol.TCP) man = new ClientTcpManager(this);
         else if(proto == Protocol.UDP) man = new ClientUdpManager(this);
@@ -79,6 +53,15 @@ public class Client
     }
     
     /**
+     * If data compression was enabled, this will disable it.
+     * WARNING: If the Server has compression enabled then this Client will not be able to send/receive proper data from the Server.
+     */
+    public void disableDataCompression()
+    {
+        man.disableDataCompression();
+    }
+    
+    /**
      * If data encryption was enabled, it is now disabled.
      * WARNING: If the Server has encryption enabled then this Client will not be able to send/receive proper data from the Server.
      */
@@ -94,6 +77,16 @@ public class Client
     public void disconnect()
     {
         man.disconnect();
+    }
+    
+    /**
+     * Enables data being sent and received to be compressed and decompressed in specified format.
+     * WARNING: This should only be enabled when sending large amounts of data.
+     * @param format The format to compress the data with.
+     */
+    public void enableDataCompression(Compression.CompressionType format)
+    {
+        man.enableDataCompression(format);
     }
     
     /**
@@ -164,15 +157,6 @@ public class Client
     public int getServerPort()
     {
         return man.getServerPort();
-    }
-    
-    /**
-     * Gets the list of {@link wrath.net.SessionFlag}s that change the way the connection is established.
-     * @return Returns the list of {@link wrath.net.SessionFlag}s that change the way the connection is established.
-     */
-    public Collection<SessionFlag> getSessionFlags()
-    {
-        return flags;
     }
     
     /**

@@ -5,11 +5,12 @@
 package wrath.net.managers;
 
 import java.io.IOException;
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.net.SocketException;
 import java.util.HashMap;
-import wrath.net.ConnectionState;
 import wrath.net.Packet;
 import wrath.net.Server;
 import wrath.net.ServerClient;
@@ -30,14 +31,36 @@ public class ServerTcpManager extends ServerManager
     public ServerTcpManager(Server server)
     {
         super(server);
-        // Define Objects
+    }
+
+    @Override
+    protected synchronized void closeSocket()
+    {
         try
         {
-            this.svr = new ServerSocket();
+            svr.close();
         }
         catch(IOException ex)
         {
-            System.err.println("] I/O Error occured while creating ServerSocket object. Cannot create server.");
+            System.err.println("] Error while closing Server Socket! I/O Error!");
+        }
+    }
+    
+    @Override
+    protected synchronized void createSocket(String ip, int port) throws IOException
+    {
+        // Define Object
+        svr = new ServerSocket();
+        
+        // Set Object Properties
+        try
+        {
+            svr.setReceiveBufferSize(Server.getServerConfig().getInt("TcpRecvBufferSize", svr.getReceiveBufferSize()));
+            svr.setReuseAddress(Server.getServerConfig().getBoolean("TcpReuseAddress", true));
+        }
+        catch(SocketException e)
+        {
+            System.err.println("] Could not set TCP ServerSocket properties! I/O Error!");
         }
         
         // Define Receive Thread
@@ -74,7 +97,7 @@ public class ServerTcpManager extends ServerManager
                                 else if(!recvFlag && isBound()) System.err.println("] Could not read data from " + c.getClientIdentifier() + "! I/O Error!");
                                 continue;
                             }
-                            onReceive(c, new Packet(rbuf));
+                            receive(c, new Packet(rbuf));
                         }
                         
                         if(clients.contains(c))
@@ -95,60 +118,14 @@ public class ServerTcpManager extends ServerManager
             }
         });
         
-        // Set Thread Properties
-        recvThread.setName("NetTcpServerRecv");
-        execThread.setName("NetTcpServerExec");
-        execThread.setDaemon(true);
-    }
-
-    @Override
-    protected synchronized void closeSocket()
-    {
-        try
-        {
-            svr.close();
-        }
-        catch(IOException ex)
-        {
-            System.err.println("] Error while closing Server Socket! I/O Error!");
-        }
-    }
-    
-    @Override
-    protected synchronized void createSocket(String ip, int port)
-    {
+        // Bind
         int backlog = Server.getServerConfig().getInt("TcpBacklog", 0);
         if(backlog == 0)
-        {
-            try
-            {
-                if("*".equals(ip)) svr.bind(new InetSocketAddress(port));
-                else svr.bind(new InetSocketAddress(ip, port));
-                
-                System.out.println("] ServerSocket bound to [" + ip + ":" + port + "].");
-            }
-            catch(IOException ex)
-            {
-                System.err.println("] Could not bind port to [" + ip + ":" + port + "]! Socket Error/Port '" + port + "' already bound!");
-                state = ConnectionState.SOCKET_NOT_BOUND_ERROR;
-                return;
-            }
-        }
+            if("*".equals(ip)) svr.bind(new InetSocketAddress(port));
+            else svr.bind(new InetSocketAddress(InetAddress.getByName(ip), port));
         else
-        {
-            try
-            {
-                if("*".equals(ip)) svr.bind(new InetSocketAddress(port), backlog);
-                else svr.bind(new InetSocketAddress(ip, port), backlog);
-                System.out.println("] ServerSocket bound to [" + ip + ":" + port + "].");
-            }
-            catch(IOException ex)
-            {
-                System.err.println("] Could not bind port to [" + ip + ":" + port + "]! Socket Error/Port '" + port + "' already bound!");
-                state = ConnectionState.SOCKET_NOT_BOUND_ERROR;
-                return;
-            }
-        }
+            if("*".equals(ip)) svr.bind(new InetSocketAddress(port), backlog);
+            else svr.bind(new InetSocketAddress(InetAddress.getByName(ip), port), backlog);
     }
 
     /**
@@ -163,7 +140,7 @@ public class ServerTcpManager extends ServerManager
     @Override
     public boolean isBound()
     {
-        return svr.isBound() && !svr.isClosed();
+        return svr != null && svr.isBound() && !svr.isClosed();
     }
 
     @Override

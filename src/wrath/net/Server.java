@@ -6,13 +6,12 @@ package wrath.net;
 
 import java.io.File;
 import java.io.Serializable;
-import java.util.Arrays;
 import java.util.Collection;
-import java.util.HashSet;
 import wrath.net.managers.ServerManager;
 import wrath.net.managers.ServerRudpManager;
 import wrath.net.managers.ServerTcpManager;
 import wrath.net.managers.ServerUdpManager;
+import wrath.util.Compression;
 import wrath.util.Config;
 
 /**
@@ -24,7 +23,6 @@ public class Server
 {
     private static final Config SERVER_CFG = new Config(new File("netserver.cfg"));
     
-    private final HashSet<SessionFlag> flags = new HashSet<>();
     private ServerListener listener;
     private final ServerManager man;
     private final Protocol proto;
@@ -36,31 +34,8 @@ public class Server
      */
     public Server(Protocol protocol, ServerListener listener)
     {
-        this(protocol, listener, new SessionFlag[0]);
-    }
-    
-    /**
-     * Constructor.
-     * @param protocol The {@link wrath.net.Protocol} the server should use for communications.
-     * @param listener The {@link wrath.net.ServerListener} to report received data to.
-     * @param flags List of {@link wrath.net.SessionFlag}s to change the way the connection is established.
-     */
-    public Server(Protocol protocol, ServerListener listener, SessionFlag...flags)
-    {
-        this(protocol, listener, Arrays.asList(flags));
-    }
-    
-    /**
-     * Constructor.
-     * @param protocol The {@link wrath.net.Protocol} the server should use for communications.
-     * @param listener The {@link wrath.net.ServerListener} to report received data to.
-     * @param flags List of {@link wrath.net.SessionFlag}s to change the way the connection is established.
-     */
-    public Server(Protocol protocol, ServerListener listener, Collection<SessionFlag> flags)
-    {
         this.proto = protocol;
         this.listener = listener;
-        this.flags.addAll(flags);
         
         if(proto == Protocol.TCP) man = new ServerTcpManager(this);
         else if(proto == Protocol.UDP) man = new ServerUdpManager(this);
@@ -89,6 +64,15 @@ public class Server
     }
     
     /**
+     * If data compression was enabled, this will disable it.
+     * WARNING: If the Server has compression enabled then this Client will not be able to send/receive proper data from the Server.
+     */
+    public void disableDataCompression()
+    {
+        man.disableDataCompression();
+    }
+    
+    /**
      * If data encryption was enabled, it is now disabled.
      * WARNING: If a Client has encryption enabled then this Server will not be able to send/receive proper data from that Client.
      */
@@ -108,9 +92,20 @@ public class Server
     }
     
     /**
+     * Enables data being sent and received to be compressed and decompressed in specified format.
+     * WARNING: This should only be enabled when sending large amounts of data.
+     * @param format The format to compress the data with.
+     */
+    public void enableDataCompression(Compression.CompressionType format)
+    {
+        man.enableDataCompression(format);
+    }
+    
+    /**
      * Enables all data going through this Server->Client connection to be encrypted/decrypted with the specified phrase/key.
      * @param passphrase The passphrase or key that must be at least 128-bit. No length limit below theoretical String length limit.
-     * WARNING: The Client and Server must both have encryption enabled with the same passphrase/key.
+     * WARNING: The Client and Server must both have encryption enabled with the same key.
+     * WARNING: Encrypting data will slightly increase the size of the data transmitted and received.
      * WARNING: Enabling this process will slow the connection noticeably.
      */
     public void enableDataEncryption(String passphrase)
@@ -195,15 +190,6 @@ public class Server
     public ServerManager getServerManager()
     {
         return man;
-    }
-    
-    /**
-     * Gets the list of {@link wrath.net.SessionFlag}s that change the way the connection is established.
-     * @return Returns the list of {@link wrath.net.SessionFlag}s that change the way the connection is established.
-     */
-    public Collection<SessionFlag> getSessionFlags()
-    {
-        return flags;
     }
     
     /**
