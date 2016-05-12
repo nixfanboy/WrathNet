@@ -225,13 +225,13 @@ public abstract class ServerManager
     
     /**
      * Enables all data going through this Server->Client connection to be encrypted/decrypted with the specified phrase/key.
-     * @param passphrase The passphrase or key that must be at least 128-bit. No length limit below theoretical String length limit.
+     * @param key The Key generated from {@link wrath.util.Encryption#generateKey(java.lang.String, java.lang.String) }.
      * WARNING: The Client and Server must both have encryption enabled with the same passphrase/key.
      * WARNING: Enabling this process will slow the connection noticeably.
      */
-    public void enableDataEncryption(String passphrase)
+    public void enableDataEncryption(SecretKeySpec key)
     {
-        encryptKey = Encryption.generateKey(passphrase, "salt");
+        encryptKey = key;
     }
     
     /**

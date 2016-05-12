@@ -7,6 +7,7 @@ package wrath.net;
 import java.io.File;
 import java.io.Serializable;
 import java.util.Collection;
+import javax.crypto.spec.SecretKeySpec;
 import wrath.net.managers.ServerManager;
 import wrath.net.managers.ServerRudpManager;
 import wrath.net.managers.ServerTcpManager;
@@ -103,14 +104,14 @@ public class Server
     
     /**
      * Enables all data going through this Server->Client connection to be encrypted/decrypted with the specified phrase/key.
-     * @param passphrase The passphrase or key that must be at least 128-bit. No length limit below theoretical String length limit.
+     * @param key The Key generated from {@link wrath.util.Encryption#generateKey(java.lang.String, java.lang.String) }.
      * WARNING: The Client and Server must both have encryption enabled with the same key.
      * WARNING: Encrypting data will slightly increase the size of the data transmitted and received.
      * WARNING: Enabling this process will slow the connection noticeably.
      */
-    public void enableDataEncryption(String passphrase)
+    public void enableDataEncryption(SecretKeySpec key)
     {
-        man.enableDataEncryption(passphrase);
+        man.enableDataEncryption(key);
     }
     
     /**
