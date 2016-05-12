@@ -16,7 +16,7 @@ import wrath.net.Client;
 import wrath.net.ConnectionState;
 import wrath.net.Packet;
 import wrath.util.Compression;
-import wrath.util.Encryption;
+import wrath.util.Encryptor;
 
 /**
  * Abstract class that allows for polymorphism based on the protocol used in a connection.
@@ -47,7 +47,7 @@ public abstract class ClientManager
                     {
                         Packet p = event.packet;
                         // Decrypt
-                        if(encryptKey != null) p = new Packet(Encryption.decryptData(p.getRawData(), encryptKey));
+                        if(encryptKey != null) p = new Packet(Encryptor.decryptData(p.getRawData(), encryptKey));
                         
                         // Decompress
                         if(compressFormat != null) p = new Packet(Compression.decompressData(p.getRawData(), compressFormat));
@@ -151,6 +151,7 @@ public abstract class ClientManager
      */
     public void disableDataEncryption()
     {
+        try{if(encryptKey != null) encryptKey.destroy();}catch(Exception e){}
         encryptKey = null;
     }
     
@@ -176,6 +177,8 @@ public abstract class ClientManager
         if(!calledFirst) System.out.println("] Received disconnect signal from host.");
         else send(Packet.TERMINATION_CALL);
         System.out.println("] Disconnecting from [" + ip + ":" + port + "]!");
+        
+        try{if(encryptKey != null) encryptKey.destroy();}catch(Exception e){}
         
         closeSocket();
         
@@ -268,7 +271,7 @@ public abstract class ClientManager
             // Compression
             if(compressFormat != null) data = Compression.compressData(data, compressFormat);
             // Encryption
-            if(encryptKey != null) data = Encryption.encryptData(data, encryptKey);
+            if(encryptKey != null) data = Encryptor.encryptData(data, encryptKey);
             // Push Data
             pushData(data);
         }
