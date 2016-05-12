@@ -123,7 +123,8 @@ public class Packet
     public Object[] getDataAsObjectArray()
     {
         if(dataAsArr != null) return dataAsArr;
-        
+        if(dataAsObj != null) return (Object[]) dataAsObj;
+            
         try
         {
             ObjectInputStream conv = new ObjectInputStream(new ByteArrayInputStream(data));
