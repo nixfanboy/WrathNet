@@ -19,6 +19,7 @@ import java.nio.charset.Charset;
  */
 public class Packet
 {
+    public static final byte[] RUDP_REQ = ((char) 0 + "rudp" + (char) 0).getBytes(Charset.forName("UTF-8"));
     public static final byte[] TERMINATION_CALL = ((char) 0 + "bye" + (char) 0).getBytes(Charset.forName("UTF-8"));
     
     private byte[] data = new byte[0];

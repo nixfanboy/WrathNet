@@ -18,7 +18,7 @@ import wrath.net.Packet;
  */
 public class ClientUdpManager extends ClientManager
 {
-    private DatagramSocket sock = null;
+    protected DatagramSocket sock = null;
     
     /**
      * Constructor.
