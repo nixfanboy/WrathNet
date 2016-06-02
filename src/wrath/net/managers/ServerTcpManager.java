@@ -42,7 +42,7 @@ public class ServerTcpManager extends ServerManager
         }
         catch(IOException ex)
         {
-            System.err.println("] Error while closing Server Socket! I/O Error!");
+            System.err.println("] ERROR: Error while closing Server Socket! I/O Error!");
         }
     }
     
@@ -60,7 +60,7 @@ public class ServerTcpManager extends ServerManager
         }
         catch(SocketException e)
         {
-            System.err.println("] Could not set TCP ServerSocket properties! I/O Error!");
+            System.err.println("] ERROR: Could not set TCP ServerSocket properties! I/O Error!");
         }
         
         // Define Receive Thread
@@ -94,7 +94,7 @@ public class ServerTcpManager extends ServerManager
                             catch(IOException e)
                             {
                                 if(!c.isConnected()) break;
-                                else if(!recvFlag && isBound()) System.err.println("] Could not read data from " + c.getClientIdentifier() + "! I/O Error!");
+                                else if(!recvFlag && isBound()) System.err.println("] ERROR: Could not read data from " + c.getClientIdentifier() + "! I/O Error!");
                                 continue;
                             }
                             receive(c, new Packet(rbuf));
@@ -103,7 +103,7 @@ public class ServerTcpManager extends ServerManager
                         if(clients.contains(c))
                             try
                             {
-                                System.err.println("] Client " + c.getClientIdentifier() + " unexpectedly disconnected!");
+                                System.err.println("] ERROR: Client " + c.getClientIdentifier() + " unexpectedly disconnected!");
                                 s.close();
                             }
                             catch(IOException e){}
@@ -113,7 +113,7 @@ public class ServerTcpManager extends ServerManager
                 }
                 catch(IOException ex)
                 {
-                    if(!recvFlag && isBound()) System.err.println("] Could not connect Client, I/O Error!");
+                    if(!recvFlag && isBound()) System.err.println("] ERROR: Could not connect Client, I/O Error!");
                 }
             }
         });
@@ -156,7 +156,7 @@ public class ServerTcpManager extends ServerManager
             }
             catch(IOException e)
             {
-                System.err.println("] Could not send data to " + client.getClientIdentifier() + "! DataSize: " + data.length + "B");
+                System.err.println("] ERROR: Could not send data to " + client.getClientIdentifier() + "! DataSize: " + data.length + "B");
             }
         }
         else System.out.println("] WARNING: Attempted to send data to unknown client!");
@@ -178,7 +178,7 @@ public class ServerTcpManager extends ServerManager
         }
         catch(IOException ex)
         {
-            System.err.println("] Could not close connection from " + client.getClientIdentifier() + "! I/O Error!");
+            System.err.println("] ERROR: Could not close connection from " + client.getClientIdentifier() + "! I/O Error!");
         }
     }
 }

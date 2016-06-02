@@ -47,7 +47,7 @@ public class ClientUdpManager extends ClientManager
         }
         catch(SocketException ex)
         {
-            System.err.println("] Could not set UDP Socket properties! I/O Error!");
+            System.err.println("] ERROR:  Could not set UDP Socket properties! I/O Error!");
         }
         
         // Define Receive Thread
@@ -105,7 +105,7 @@ public class ClientUdpManager extends ClientManager
         }
         catch(IOException ex)
         {
-            System.err.println("] Could not send data to [" + sock.getInetAddress().getHostAddress() + ":" + sock.getPort() + "]! I/O Error!");
+            System.err.println("] ERROR:  Could not send data to [" + sock.getInetAddress().getHostAddress() + ":" + sock.getPort() + "]! I/O Error!");
         }
     }
 }

@@ -137,7 +137,7 @@ public abstract class ServerManager
         }
         catch(IOException e)
         {
-            System.err.println("] Could not bind ServerSocket to [" + ip + ":" + port + "]! UNKNOWN Error!");
+            System.err.println("] ERROR:  Could not bind ServerSocket to [" + ip + ":" + port + "]! UNKNOWN Error!");
             state = ConnectionState.SOCKET_NOT_BOUND_ERROR;
         }
     }

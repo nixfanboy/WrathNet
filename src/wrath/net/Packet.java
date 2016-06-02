@@ -53,7 +53,7 @@ public class Packet
         }
         catch(IOException e)
         {
-            System.err.println("Could not convert object data to bytes, I/O ERROR!");
+            System.err.println("] ERROR: Could not convert object data to bytes, I/O ERROR!");
         }
     }
     
@@ -76,7 +76,7 @@ public class Packet
         }
         catch(IOException e)
         {
-            System.err.println("Could not convert object data to bytes, I/O ERROR!");
+            System.err.println("] ERROR: Could not convert object data to bytes, I/O ERROR!");
         }
     }
     
@@ -105,12 +105,12 @@ public class Packet
         }
         catch(ClassNotFoundException e)
         {
-            System.err.println("Could not read packet data as an Object, Unknown or corrupted data!");
+            System.err.println("] ERROR: Could not read packet data as an Object, Unknown or corrupted data!");
             this.dataAsObj = null;
         }
         catch(IOException e)
         {
-            System.err.println("Could not read packet data as an Object, I/O ERROR!");
+            System.err.println("] ERROR: Could not read packet data as an Object, I/O ERROR!");
             this.dataAsObj = null;
         }
         
@@ -140,11 +140,11 @@ public class Packet
         }
         catch(ClassNotFoundException e)
         {
-            System.err.println("Could not read packet data as an Object, Unknown or corrupted data!");
+            System.err.println("] ERROR: Could not read packet data as an Object, Unknown or corrupted data!");
         }
         catch(IOException e)
         {
-            System.err.println("Could not read packet data as an Object, I/O ERROR!");
+            System.err.println("] ERROR: Could not read packet data as an Object, I/O ERROR!");
         }
         
         return null;

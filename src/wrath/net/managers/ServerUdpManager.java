@@ -57,7 +57,7 @@ public class ServerUdpManager extends ServerManager
         }
         catch(SocketException ex)
         {
-            System.err.println("] Could not set UDP Socket properties! I/O Error!");
+            System.err.println("] ERROR:  Could not set UDP Socket properties! I/O Error!");
         }
         
         // Define Receive Thread
@@ -89,7 +89,7 @@ public class ServerUdpManager extends ServerManager
                 }
                 catch(IOException ex)
                 {
-                    if(!recvFlag && isBound()) System.err.println("] Could not read data from UDP client! I/O Error!");
+                    if(!recvFlag && isBound()) System.err.println("] ERROR:  Could not read data from UDP client! I/O Error!");
                 }
             }
         });
@@ -119,7 +119,7 @@ public class ServerUdpManager extends ServerManager
         } 
         catch(IOException ex)
         {
-            System.err.println("] Could not send data to " + client.getClientIdentifier() + "! DataSize: " + data.length + "B");
+            System.err.println("] ERROR:  Could not send data to " + client.getClientIdentifier() + "! DataSize: " + data.length + "B");
         }
     }
     

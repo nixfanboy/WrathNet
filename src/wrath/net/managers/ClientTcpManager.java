@@ -49,7 +49,7 @@ public class ClientTcpManager extends ClientManager
         }
         catch(SocketException e)
         {
-            System.err.println("] Could not set TCP Socket properties! I/O Error!");
+            System.err.println("] ERROR:  Could not set TCP Socket properties! I/O Error!");
         }
         
         // Define Receive Thread
@@ -69,7 +69,7 @@ public class ClientTcpManager extends ClientManager
                 }
                 catch(IOException e)
                 {
-                    if(isConnected() && !recvFlag) System.err.println("] Could not read from input stream from [" + ip + ":" + port + "]!");
+                    if(isConnected() && !recvFlag) System.err.println("] ERROR:  Could not read from input stream from [" + ip + ":" + port + "]!");
                     continue;
                 }
                 receive(client, new Packet(rbuf));
@@ -90,7 +90,7 @@ public class ClientTcpManager extends ClientManager
         catch(IOException e)
         {
             state = ConnectionState.DISCONNECTED_CONNECTION_DROPPED;
-            System.err.println("] I/O Error occured while closing socket from [" + ip + ":" + port + "]!");
+            System.err.println("] ERROR:  I/O Error occured while closing socket from [" + ip + ":" + port + "]!");
             return;
         }
     }
@@ -120,7 +120,7 @@ public class ClientTcpManager extends ClientManager
         }
         catch (IOException ex) 
         {
-            System.err.println("] Could not send data to [" + ip + ":" + port + "]! DataSize: " + data.length + "B");
+            System.err.println("] ERROR:  Could not send data to [" + ip + ":" + port + "]! DataSize: " + data.length + "B");
         }
     }
 }

@@ -119,12 +119,12 @@ public abstract class ClientManager
         }
         catch(UnknownHostException e)
         {
-            System.err.println("] Could not resolve hostname/ip [" + ip + "]!");
+            System.err.println("] ERROR:  Could not resolve hostname/ip [" + ip + "]!");
             state = ConnectionState.DISCONNECTED_CONNECTION_FAILED;
         }
         catch(IOException e)
         {
-            System.err.println("] Could not connect to [" + ip + ":" + port + "]! I/O Error!");
+            System.err.println("] ERROR:  Could not connect to [" + ip + ":" + port + "]! I/O Error!");
             state = ConnectionState.DISCONNECTED_CONNECTION_FAILED;
         }
     }
